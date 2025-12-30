@@ -31,10 +31,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Shield, UserPlus, Users, Mail, Trash2, ArrowLeft } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Shield, UserPlus, Users, Mail, Trash2, ArrowLeft, User, Key, LogOut } from 'lucide-react';
 
 // Admin email - only this user can access admin features
 const ADMIN_EMAIL = 'mkaleb@hpvgproperties.com';
+
+// Map user emails to full names
+const EMAIL_TO_NAME: Record<string, string> = {
+  'mkaleb@hpvgproperties.com': 'Matthew Kaleb',
+  'mdillon@hpvgproperties.com': 'Michael Dillon',
+  'matthew.kaleb1763@gmail.com': 'Matthew Kaleb',
+};
 
 interface UserProfile {
   id: string;
@@ -54,8 +69,13 @@ interface PendingInvite {
 }
 
 export default function AdminPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
+  
+  const handleSignOut = async () => {
+    await signOut();
+    router.push('/login');
+  };
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [invites, setInvites] = useState<PendingInvite[]>([]);
   const [loading, setLoading] = useState(true);
@@ -264,10 +284,33 @@ export default function AdminPage() {
                 </p>
               </div>
             </div>
-            <Button variant="outline" onClick={() => router.push('/')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" onClick={() => router.push('/')}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Dashboard
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <User className="h-4 w-4 mr-2" />
+                    {user?.email ? (EMAIL_TO_NAME[user.email] || user.email.split('@')[0]) : 'Account'}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => router.push('/settings')}>
+                    <Key className="h-4 w-4 mr-2" />
+                    Change Password
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </header>
