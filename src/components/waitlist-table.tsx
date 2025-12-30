@@ -97,6 +97,7 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
       floor_pref: entry.floor_pref,
       max_budget: entry.max_budget,
       move_in_date: entry.move_in_date,
+      move_in_date_end: entry.move_in_date_end,
       internal_notes: entry.internal_notes,
       assigned_agent: entry.assigned_agent,
       status: entry.status,
@@ -107,6 +108,25 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
 
   const handleEditSave = async () => {
     if (!editingEntry) return;
+
+    // Calculate what changed
+    const changes: Record<string, { old: unknown; new: unknown }> = {};
+    Object.keys(editForm).forEach(key => {
+      const oldVal = editingEntry[key as keyof typeof editingEntry];
+      const newVal = editForm[key as keyof typeof editForm];
+      if (oldVal !== newVal) {
+        changes[key] = { old: oldVal, new: newVal };
+      }
+    });
+
+    // Log the edit before making changes
+    await supabase.from('activity_log').insert({
+      action_type: 'edit',
+      entry_id: editingEntry.id,
+      entry_data: editingEntry,
+      changed_by: currentUserEmail || null,
+      changes: changes,
+    });
 
     const { error } = await supabase
       .from('waitlist_entries')
@@ -156,6 +176,15 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
     if (!confirm(`Are you sure you want to delete ${name} from the waitlist?`)) {
       return;
     }
+
+    // Log the deletion before deleting
+    await supabase.from('activity_log').insert({
+      action_type: 'delete',
+      entry_id: id,
+      entry_data: entry,
+      changed_by: currentUserEmail || null,
+      changes: null,
+    });
 
     const { error } = await supabase
       .from('waitlist_entries')
@@ -417,22 +446,10 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
                     {isExpanded && (
                       <TableRow key={`${entry.id}-expanded`} className="bg-muted/30">
                         <TableCell colSpan={10} className="p-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <h4 className="font-semibold text-sm mb-2">Internal Notes</h4>
-                              <p className="text-sm text-muted-foreground bg-white dark:bg-gray-800 p-3 rounded border min-h-[60px]">
-                                {entry.internal_notes || 'No notes added'}
-                              </p>
-                            </div>
-                            <div>
-                              <h4 className="font-semibold text-sm mb-2">Entry Details</h4>
-                              <div className="text-sm space-y-1 bg-white dark:bg-gray-800 p-3 rounded border">
-                                <p><span className="text-muted-foreground">Created:</span> {new Date(entry.created_at).toLocaleString()}</p>
-                                <p><span className="text-muted-foreground">Entry ID:</span> {entry.id.slice(0, 8)}...</p>
-                                {entry.preferred_units && (
-                                  <p><span className="text-muted-foreground">Preferred Units:</span> {entry.preferred_units}</p>
-                                )}
-                              </div>
+                          <div>
+                            <h4 className="font-semibold text-sm mb-2">Internal Notes</h4>
+                            <div className="text-sm text-muted-foreground bg-white dark:bg-gray-800 p-3 rounded border min-h-[60px] max-w-full whitespace-pre-wrap break-words">
+                              {entry.internal_notes || 'No notes added'}
                             </div>
                           </div>
                         </TableCell>
@@ -577,6 +594,16 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
                 onChange={(e) => setEditForm({ ...editForm, preferred_units: e.target.value })}
                 placeholder="e.g., 101, 205, 310"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-move-in-end">Move-in End Date (optional)</Label>
+              <Input
+                id="edit-move-in-end"
+                type="date"
+                value={editForm.move_in_date_end || ''}
+                onChange={(e) => setEditForm({ ...editForm, move_in_date_end: e.target.value || null })}
+              />
+              <p className="text-xs text-muted-foreground">Leave empty for single date</p>
             </div>
             <div className="col-span-2 space-y-2">
               <Label htmlFor="edit-notes">Internal Notes</Label>

@@ -37,26 +37,60 @@ export function SheetsMatchAlerts({ units, waitlistEntries }: SheetsMatchAlertsP
   const findMatches = (): Match[] => {
     const activeEntries = waitlistEntries.filter(e => e.status === 'Active');
     const matches: Match[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     for (const unit of units) {
       const matchingEntries = activeEntries.filter(entry => {
-        // Match by property
+        // Match by property (required)
         if (entry.property !== unit.property) return false;
         
-        // Match by unit type
+        // Match by unit type (required)
         if (entry.unit_type_pref !== unit.unit_type) return false;
         
-        // Match by budget (if specified)
-        if (entry.max_budget > 0 && unit.rent_price > entry.max_budget) return false;
+        // Match by move-in date (required)
+        const entryMoveInStart = new Date(entry.move_in_date);
+        entryMoveInStart.setHours(0, 0, 0, 0);
+        const entryMoveInEnd = entry.move_in_date_end 
+          ? new Date(entry.move_in_date_end) 
+          : entryMoveInStart;
+        entryMoveInEnd.setHours(0, 0, 0, 0);
         
-        // Match by move-in date (unit available on or before their desired date)
-        if (unit.available_date) {
-          const unitAvailable = new Date(unit.available_date);
-          const desiredMoveIn = new Date(entry.move_in_date);
-          if (unitAvailable > desiredMoveIn) return false;
+        // Determine unit availability date
+        let unitAvailable: Date;
+        const isAvailableNow = !unit.available_date || 
+          unit.available_date.toLowerCase() === 'now' || 
+          unit.available_date.toLowerCase() === 'available';
+        
+        if (isAvailableNow) {
+          unitAvailable = today;
+          // For units available "Now", only match entries wanting to move in within 30 days
+          const thirtyDaysFromNow = new Date(today);
+          thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+          
+          // Entry's move-in range should overlap with now to 30 days from now
+          if (entryMoveInStart > thirtyDaysFromNow) return false;
+          if (entryMoveInEnd < today) return false;
+        } else {
+          unitAvailable = new Date(unit.available_date!);
+          unitAvailable.setHours(0, 0, 0, 0);
+          
+          // Check if unit availability falls within entry's desired move-in range
+          // Entry should be looking to move in on or after unit is available
+          // and entry's start date should not be too far in the future from unit availability
+          if (entry.move_in_date_end) {
+            // Entry has a range: unit available date should fall within or before the range
+            if (unitAvailable > entryMoveInEnd) return false;
+          } else {
+            // Entry has single date: unit should be available on or before entry's move-in date
+            if (unitAvailable > entryMoveInStart) return false;
+          }
         }
         
-        // Match by preferred units (if specified)
+        // Match by budget (optional - only filter if budget is set)
+        if (entry.max_budget > 0 && unit.rent_price > entry.max_budget) return false;
+        
+        // Match by preferred units (optional - only filter if specified)
         if (entry.preferred_units) {
           const preferredList = entry.preferred_units.split(',').map(u => u.trim().toLowerCase());
           if (!preferredList.includes(unit.unit_number.toLowerCase())) return false;

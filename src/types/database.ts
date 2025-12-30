@@ -17,6 +17,7 @@ export interface WaitlistEntry {
   floor_pref: FloorPreference;
   max_budget: number;
   move_in_date: string;
+  move_in_date_end: string | null;
   current_unit_number: string | null;
   internal_notes: string | null;
 }
@@ -42,6 +43,16 @@ export interface WaitlistMatch {
   matches: WaitlistEntry[];
 }
 
+export interface ActivityLog {
+  id: string;
+  created_at: string;
+  action_type: 'create' | 'edit' | 'delete';
+  entry_id: string | null;
+  entry_data: WaitlistEntry;
+  changed_by: string | null;
+  changes: Record<string, { old: unknown; new: unknown }> | null;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -54,6 +65,11 @@ export interface Database {
         Row: AvailableUnit;
         Insert: Omit<AvailableUnit, 'id' | 'created_at'>;
         Update: Partial<Omit<AvailableUnit, 'id' | 'created_at'>>;
+      };
+      activity_log: {
+        Row: ActivityLog;
+        Insert: Omit<ActivityLog, 'id' | 'created_at'>;
+        Update: Partial<Omit<ActivityLog, 'id' | 'created_at'>>;
       };
     };
   };

@@ -29,6 +29,7 @@ interface AddEntryFormProps {
 export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
   const [open, setOpen] = useState(false);
   const [isCurrentResident, setIsCurrentResident] = useState(false);
+  const [useDateRange, setUseDateRange] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
@@ -53,6 +54,7 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
       preferred_units: '',
       max_budget: '',
       move_in_date: '',
+      move_in_date_end: '',
       current_unit_number: '',
       internal_notes: '',
     },
@@ -111,6 +113,7 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
         floor_pref: data.floor_pref as string,
         max_budget: data.max_budget ? Number(data.max_budget) : 0,
         move_in_date: data.move_in_date as string,
+        move_in_date_end: useDateRange ? (data.move_in_date_end as string) || null : null,
         current_unit_number: (data.current_unit_number as string) || null,
         internal_notes: (data.internal_notes as string) || null,
       });
@@ -119,6 +122,7 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
 
       reset();
       setIsCurrentResident(false);
+      setUseDateRange(false);
       setOpen(false);
       onEntryAdded();
     } catch (error) {
@@ -314,7 +318,7 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
             </div>
 
             <div>
-              <Label htmlFor="move_in_date">Move-in Date *</Label>
+              <Label htmlFor="move_in_date">{useDateRange ? 'Move-in Start Date *' : 'Move-in Date *'}</Label>
               <Input 
                 id="move_in_date" 
                 type="date" 
@@ -330,6 +334,29 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
               )}
             </div>
           </div>
+
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="useDateRange"
+              checked={useDateRange}
+              onChange={(e) => setUseDateRange(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <Label htmlFor="useDateRange">Use move-in date range</Label>
+          </div>
+
+          {useDateRange && (
+            <div>
+              <Label htmlFor="move_in_date_end">Move-in End Date</Label>
+              <Input 
+                id="move_in_date_end" 
+                type="date" 
+                {...register('move_in_date_end')} 
+              />
+              <p className="text-xs text-muted-foreground mt-1">Entry will match units available between start and end dates</p>
+            </div>
+          )}
 
           <div>
             <Label htmlFor="internal_notes">Internal Notes</Label>

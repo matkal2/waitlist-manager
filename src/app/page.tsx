@@ -9,11 +9,12 @@ import { AddEntryForm } from '@/components/add-entry-form';
 import { WaitlistTable } from '@/components/waitlist-table';
 import { SheetsUnits } from '@/components/sheets-units';
 import { SheetsMatchAlerts } from '@/components/sheets-match-alerts';
+import { ActivityLogView } from '@/components/activity-log';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Building2, Users, Clock, Home as HomeIcon, Bell, LogOut } from 'lucide-react';
+import { Building2, Users, Clock, Home as HomeIcon, Bell, LogOut, History } from 'lucide-react';
 
 interface SheetUnit {
   property: string;
@@ -206,6 +207,12 @@ export default function Home() {
                 )}
               </span>
             </TabsTrigger>
+            <TabsTrigger value="activity">
+              <span className="flex items-center gap-2">
+                <History className="h-4 w-4" />
+                Activity Log
+              </span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard">
@@ -256,6 +263,20 @@ export default function Home() {
                   units={sheetUnits} 
                   waitlistEntries={entries}
                 />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="activity">
+            <Card>
+              <CardHeader>
+                <CardTitle>Activity Log</CardTitle>
+                <CardDescription>
+                  View and revert changes made to waitlist entries in the last 6 months.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ActivityLogView onRevert={fetchEntries} />
               </CardContent>
             </Card>
           </TabsContent>
