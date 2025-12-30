@@ -88,8 +88,9 @@ function extractUnitNumber(addressAndApt: string): string {
 }
 
 async function fetchSheetUnits(): Promise<SheetUnit[]> {
-  const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json`;
-  const response = await fetch(url);
+  // Fetch from DASH sheet specifically
+  const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=DASH`;
+  const response = await fetch(url, { cache: 'no-store' });
   const text = await response.text();
   const jsonStr = text.replace(/^[^(]*\(/, '').replace(/\);?$/, '');
   const data = JSON.parse(jsonStr);
@@ -103,17 +104,32 @@ async function fetchSheetUnits(): Promise<SheetUnit[]> {
     const propertyRaw = cells[0]?.v || '';
     const status = cells[5]?.v || '';
     const addressAndApt = cells[6]?.v || '';
-    const bedrooms = cells[7]?.v || 0;
+    const bedrooms = cells[7]?.v ?? cells[7]?.f ?? null;
+    const sqFootage = cells[9]?.v || 0;
     const availableDateRaw = cells[10]?.v || null;
     const rentPrice = cells[11]?.v || 0;
     const uniqueId = cells[4]?.v || '';
     
     if (status !== 'Available') continue;
     
+    // Determine unit type with fallback based on square footage
+    let unitType: string;
+    if (bedrooms && bedrooms > 0) {
+      unitType = bedroomsToUnitType(bedrooms);
+    } else if (sqFootage >= 1800) {
+      unitType = '3BR';
+    } else if (sqFootage >= 1000) {
+      unitType = '2BR';
+    } else if (sqFootage >= 600) {
+      unitType = '1BR';
+    } else {
+      unitType = 'Studio';
+    }
+    
     units.push({
       property: mapPropertyName(propertyRaw),
       unit_number: extractUnitNumber(addressAndApt),
-      unit_type: bedroomsToUnitType(bedrooms),
+      unit_type: unitType,
       rent_price: rentPrice,
       available_date: parseGoogleDate(availableDateRaw),
       unique_id: uniqueId,

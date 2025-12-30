@@ -162,6 +162,10 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
   const handleStatusChange = async (id: string, newStatus: string) => {
     console.log('Status change requested:', { id, newStatus });
     
+    // Find the current entry to get old status
+    const currentEntry = entries.find(e => e.id === id);
+    const oldStatus = currentEntry?.status || 'Unknown';
+    
     try {
       const { data, error } = await supabase
         .from('waitlist_entries')
@@ -174,6 +178,16 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
         alert(`Failed to update status: ${error.message}`);
       } else {
         console.log('Status updated successfully:', data);
+        
+        // Log the status change to activity_log
+        await supabase.from('activity_log').insert({
+          action_type: 'update',
+          entry_id: id,
+          entry_data: currentEntry,
+          changed_by: currentUserEmail || null,
+          changes: { field: 'status', old_value: oldStatus, new_value: newStatus },
+        });
+        
         onRefresh();
       }
     } catch (err) {

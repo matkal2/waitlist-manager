@@ -69,9 +69,29 @@ FROM auth.users WHERE email = 'mdillon@hpvgproperties.com'
 ON CONFLICT (email) DO UPDATE SET full_name = 'Michael Dillon';
 
 -- =====================================================
--- OPTIONAL: Update status column constraint if needed
+-- STEP 3: Create notified_matches table for auto-notify
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS notified_matches (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  match_key TEXT NOT NULL UNIQUE,
+  agent TEXT NOT NULL,
+  unit_id TEXT NOT NULL,
+  entry_ids TEXT[] NOT NULL,
+  notified_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+ALTER TABLE notified_matches ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all on notified_matches" ON notified_matches;
+CREATE POLICY "Allow all on notified_matches" ON notified_matches FOR ALL USING (true) WITH CHECK (true);
+
+-- =====================================================
+-- STEP 4: Fix status column constraint
 -- Run this if status changes are failing
 -- =====================================================
 
--- Remove any CHECK constraint on status column (if it exists)
--- ALTER TABLE waitlist_entries DROP CONSTRAINT IF EXISTS waitlist_entries_status_check;
+ALTER TABLE waitlist_entries DROP CONSTRAINT IF EXISTS waitlist_entries_status_check;
+
+ALTER TABLE waitlist_entries ADD CONSTRAINT waitlist_entries_status_check 
+CHECK (status IN ('Active', 'Showing Scheduled', 'Applied', 'Signed Lease', 'Inactive', 'Leased'));

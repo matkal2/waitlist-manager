@@ -225,6 +225,14 @@ export default function AdminPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
+        // If email fails due to domain verification, still show success but warn
+        if (errorData.error?.includes('verify a domain')) {
+          alert(`Invite created for ${inviteForm.email}!\n\nNote: Email could not be sent (Resend domain not verified). Please share the registration link manually:\n\n${window.location.origin}/register?invite=${invite.id}`);
+          setInviteForm({ email: '', full_name: '' });
+          setInviteOpen(false);
+          fetchInvites();
+          return;
+        }
         throw new Error(errorData.error || 'Failed to send invite email');
       }
 
