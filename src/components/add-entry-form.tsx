@@ -316,47 +316,69 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
                 placeholder="2000"
               />
             </div>
-
-            <div>
-              <Label htmlFor="move_in_date">{useDateRange ? 'Move-in Start Date *' : 'Move-in Date *'}</Label>
-              <Input 
-                id="move_in_date" 
-                type="date" 
-                {...register('move_in_date')} 
-                className={validationErrors.move_in_date ? 'border-red-500 focus:ring-red-500' : ''}
-                onChange={(e) => {
-                  register('move_in_date').onChange(e);
-                  setValidationErrors(prev => ({ ...prev, move_in_date: '' }));
-                }}
-              />
-              {validationErrors.move_in_date && (
-                <p className="text-sm text-red-500 mt-1">{validationErrors.move_in_date}</p>
-              )}
-            </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="useDateRange"
-              checked={useDateRange}
-              onChange={(e) => setUseDateRange(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            <Label htmlFor="useDateRange">Use move-in date range</Label>
-          </div>
-
-          {useDateRange && (
-            <div>
-              <Label htmlFor="move_in_date_end">Move-in End Date</Label>
-              <Input 
-                id="move_in_date_end" 
-                type="date" 
-                {...register('move_in_date_end')} 
+          <div className="space-y-2">
+            {useDateRange ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="move_in_date">Move-in Start Date *</Label>
+                  <Input 
+                    id="move_in_date" 
+                    type="date" 
+                    {...register('move_in_date')} 
+                    className={validationErrors.move_in_date ? 'border-red-500 focus:ring-red-500' : ''}
+                    onChange={(e) => {
+                      register('move_in_date').onChange(e);
+                      setValidationErrors(prev => ({ ...prev, move_in_date: '' }));
+                    }}
+                  />
+                  {validationErrors.move_in_date && (
+                    <p className="text-sm text-red-500 mt-1">{validationErrors.move_in_date}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="move_in_date_end">Move-in End Date</Label>
+                  <Input 
+                    id="move_in_date_end" 
+                    type="date" 
+                    {...register('move_in_date_end')} 
+                  />
+                </div>
+              </div>
+            ) : (
+              <div>
+                <Label htmlFor="move_in_date">Move-in Date *</Label>
+                <Input 
+                  id="move_in_date" 
+                  type="date" 
+                  {...register('move_in_date')} 
+                  className={validationErrors.move_in_date ? 'border-red-500 focus:ring-red-500' : ''}
+                  onChange={(e) => {
+                    register('move_in_date').onChange(e);
+                    setValidationErrors(prev => ({ ...prev, move_in_date: '' }));
+                  }}
+                />
+                {validationErrors.move_in_date && (
+                  <p className="text-sm text-red-500 mt-1">{validationErrors.move_in_date}</p>
+                )}
+              </div>
+            )}
+            
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="useDateRange"
+                checked={useDateRange}
+                onChange={(e) => setUseDateRange(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
               />
-              <p className="text-xs text-muted-foreground mt-1">Entry will match units available between start and end dates</p>
+              <Label htmlFor="useDateRange" className="text-sm font-normal cursor-pointer">Use move-in date range</Label>
             </div>
-          )}
+            {useDateRange && (
+              <p className="text-xs text-muted-foreground">Entry will match units available between start and end dates</p>
+            )}
+          </div>
 
           <div>
             <Label htmlFor="internal_notes">Internal Notes</Label>
