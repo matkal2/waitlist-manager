@@ -106,21 +106,29 @@ export async function GET() {
       const propertyRaw = cells[0]?.v || '';
       const status = cells[5]?.v || '';
       const addressAndApt = cells[6]?.v || '';
-      const bedrooms = cells[7]?.v || 0;
+      const bedrooms = cells[7]?.v ?? cells[7]?.f ?? 0; // Try formatted value too
       const bathrooms = cells[8]?.v || 0;
       const sqFootage = cells[9]?.v || 0;
       const availableDateRaw = cells[10]?.v || null;
       const rentPrice = cells[11]?.v || 0;
       const uniqueId = cells[4]?.v || '';
       
+      // Also check for unit type in a different column (some sheets have it separately)
+      const unitTypeRaw = cells[12]?.v || cells[7]?.f || null; // Check column 12 or formatted value of 7
+      
       // Only include available units
       if (status !== 'Available') continue;
+      
+      // Use unitTypeRaw if it contains text like "3BD + Den", otherwise use bedrooms number
+      const finalUnitType = unitTypeRaw && typeof unitTypeRaw === 'string' && unitTypeRaw.includes('BD') 
+        ? unitTypeRaw 
+        : bedroomsToUnitType(bedrooms);
       
       const unit: SheetUnit = {
         property: mapPropertyName(propertyRaw),
         unit_number: extractUnitNumber(addressAndApt),
-        unit_type: bedroomsToUnitType(bedrooms),
-        bedrooms,
+        unit_type: finalUnitType,
+        bedrooms: typeof bedrooms === 'number' ? bedrooms : parseInt(String(bedrooms)) || 0,
         bathrooms,
         sq_footage: sqFootage,
         available_date: parseGoogleDate(availableDateRaw),

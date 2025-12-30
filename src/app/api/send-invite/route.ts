@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(request: NextRequest) {
   try {
+    // Check if API key is configured
+    if (!process.env.RESEND_API_KEY) {
+      console.error('RESEND_API_KEY is not configured');
+      return NextResponse.json({ 
+        error: 'Email service not configured. Please add RESEND_API_KEY to environment variables.' 
+      }, { status: 500 });
+    }
+    
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    
     const { email, full_name, invite_id } = await request.json();
 
     if (!email || !full_name || !invite_id) {
@@ -12,11 +20,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the base URL from the request
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://waitlist-manager.vercel.app';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://waitlist-manager-181gzrqgc-matthew-kalebs-projects.vercel.app';
     const registerUrl = `${baseUrl}/register?invite=${invite_id}`;
 
-    // Use Resend's default domain if custom domain not verified
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'Waitlist Manager <onboarding@resend.dev>';
+    // Use Resend's default domain - works without custom domain verification
+    const fromEmail = 'Waitlist Manager <onboarding@resend.dev>';
     
     const { data, error } = await resend.emails.send({
       from: fromEmail,

@@ -417,22 +417,16 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
                         )}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Select
+                        <select
                           value={entry.status}
-                          onValueChange={(value) => handleStatusChange(entry.id, value)}
+                          onChange={(e) => handleStatusChange(entry.id, e.target.value)}
+                          className="px-3 py-1 text-sm rounded-md border border-input bg-background cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
                         >
-                          <SelectTrigger className="w-[150px] h-8">
-                            <Badge variant={getStatusBadgeVariant(entry.status) as any}>
-                              {entry.status}
-                            </Badge>
-                          </SelectTrigger>
-                          <SelectContent className="z-50">
-                            <SelectItem value="Active">Active</SelectItem>
-                            <SelectItem value="Showing Scheduled">Showing Scheduled</SelectItem>
-                            <SelectItem value="Applied">Applied</SelectItem>
-                            <SelectItem value="Signed Lease">Signed Lease</SelectItem>
-                          </SelectContent>
-                        </Select>
+                          <option value="Active">Active</option>
+                          <option value="Showing Scheduled">Showing Scheduled</option>
+                          <option value="Applied">Applied</option>
+                          <option value="Signed Lease">Signed Lease</option>
+                        </select>
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
