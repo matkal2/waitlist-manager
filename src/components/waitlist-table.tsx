@@ -160,16 +160,25 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
   };
 
   const handleStatusChange = async (id: string, newStatus: string) => {
-    const { error } = await supabase
-      .from('waitlist_entries')
-      .update({ status: newStatus })
-      .eq('id', id);
+    console.log('Status change requested:', { id, newStatus });
+    
+    try {
+      const { data, error } = await supabase
+        .from('waitlist_entries')
+        .update({ status: newStatus })
+        .eq('id', id)
+        .select();
 
-    if (error) {
-      console.error('Error updating status:', error);
+      if (error) {
+        console.error('Error updating status:', error);
+        alert(`Failed to update status: ${error.message}`);
+      } else {
+        console.log('Status updated successfully:', data);
+        onRefresh();
+      }
+    } catch (err) {
+      console.error('Exception updating status:', err);
       alert('Failed to update status');
-    } else {
-      onRefresh();
     }
   };
 

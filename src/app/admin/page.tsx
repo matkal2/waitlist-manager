@@ -83,19 +83,27 @@ export default function AdminPage() {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      // Try API endpoint first
+      const response = await fetch('/api/admin/users');
+      const result = await response.json();
       
-      // Map is_admin to role
-      const mappedUsers = (data || []).map(u => ({
-        ...u,
-        role: u.is_admin ? 'Admin' as const : 'General' as const
-      }));
-      setUsers(mappedUsers);
+      if (result.success && result.users) {
+        setUsers(result.users);
+      } else {
+        // Fallback to direct Supabase query
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        
+        const mappedUsers = (data || []).map(u => ({
+          ...u,
+          role: u.is_admin ? 'Admin' as const : 'General' as const
+        }));
+        setUsers(mappedUsers);
+      }
     } catch (error) {
       console.error('Error fetching users:', error);
     } finally {

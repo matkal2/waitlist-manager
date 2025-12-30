@@ -55,8 +55,22 @@ function mapPropertyName(name: string): string {
   return mapping[name] || name.replace(/_/g, ' ');
 }
 
-function bedroomsToUnitType(bedrooms: number): string {
-  if (bedrooms === 0) return 'Studio';
+function bedroomsToUnitType(bedrooms: number | string | null): string {
+  // Handle string values like "3BD + Den"
+  if (typeof bedrooms === 'string') {
+    const match = bedrooms.match(/(\d+)/);
+    if (match) {
+      const num = parseInt(match[1]);
+      if (num === 0) return 'Studio';
+      return `${num}BR`;
+    }
+    // Check for specific patterns
+    if (bedrooms.toLowerCase().includes('studio')) return 'Studio';
+    return bedrooms; // Return as-is if can't parse
+  }
+  
+  // Handle numeric values
+  if (bedrooms === null || bedrooms === undefined || bedrooms === 0) return 'Studio';
   return `${bedrooms}BR`;
 }
 

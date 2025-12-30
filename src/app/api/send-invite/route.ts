@@ -15,8 +15,11 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://waitlist-manager.vercel.app';
     const registerUrl = `${baseUrl}/register?invite=${invite_id}`;
 
+    // Use Resend's default domain if custom domain not verified
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'Waitlist Manager <onboarding@resend.dev>';
+    
     const { data, error } = await resend.emails.send({
-      from: 'Waitlist Manager <noreply@hpvgproperties.com>',
+      from: fromEmail,
       to: email,
       subject: 'You\'ve Been Invited to Waitlist Manager',
       html: `
