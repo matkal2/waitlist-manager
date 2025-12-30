@@ -55,6 +55,12 @@ const PROPERTIES = [
 
 const AGENTS = ['Matthew Kaleb', 'Michael Dillon'];
 
+// Format date without timezone shift (parses YYYY-MM-DD as local date)
+const formatDateLocal = (dateString: string) => {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString();
+};
+
 export function WaitlistTable({ entries, onRefresh, currentUserEmail }: WaitlistTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [agentFilter, setAgentFilter] = useState<string>('all');
@@ -388,7 +394,7 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
                         </div>
                       </TableCell>
                       <TableCell>${entry.max_budget.toLocaleString()}</TableCell>
-                      <TableCell>{new Date(entry.move_in_date).toLocaleDateString()}</TableCell>
+                      <TableCell>{formatDateLocal(entry.move_in_date)}</TableCell>
                       <TableCell>
                         {entry.assigned_agent ? (
                           <div className="flex items-center gap-1">
@@ -411,7 +417,7 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
                               {entry.status}
                             </Badge>
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="z-50">
                             <SelectItem value="Active">Active</SelectItem>
                             <SelectItem value="Showing Scheduled">Showing Scheduled</SelectItem>
                             <SelectItem value="Applied">Applied</SelectItem>

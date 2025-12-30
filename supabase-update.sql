@@ -1,3 +1,7 @@
+-- =====================================================
+-- STEP 1: Run this FIRST to create all tables
+-- =====================================================
+
 -- Add move_in_date_end column to waitlist_entries
 ALTER TABLE waitlist_entries ADD COLUMN IF NOT EXISTS move_in_date_end DATE;
 
@@ -5,21 +9,19 @@ ALTER TABLE waitlist_entries ADD COLUMN IF NOT EXISTS move_in_date_end DATE;
 CREATE TABLE IF NOT EXISTS activity_log (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  action_type TEXT NOT NULL, -- 'edit', 'delete', 'create'
+  action_type TEXT NOT NULL,
   entry_id UUID,
-  entry_data JSONB NOT NULL, -- snapshot of entry before change
-  changed_by TEXT, -- email of user who made change
-  changes JSONB -- for edits: what fields changed
+  entry_data JSONB NOT NULL,
+  changed_by TEXT,
+  changes JSONB
 );
 
--- Enable RLS for activity_log
 ALTER TABLE activity_log ENABLE ROW LEVEL SECURITY;
-
--- Policy to allow all operations for authenticated users on activity_log
+DROP POLICY IF EXISTS "Allow all operations for authenticated users" ON activity_log;
 CREATE POLICY "Allow all operations for authenticated users" ON activity_log
   FOR ALL USING (true) WITH CHECK (true);
 
--- Create user_profiles table for storing user information
+-- Create user_profiles table
 CREATE TABLE IF NOT EXISTS user_profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -28,22 +30,14 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   is_admin BOOLEAN DEFAULT FALSE
 );
 
--- Enable RLS for user_profiles
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow users to read profiles" ON user_profiles;
+DROP POLICY IF EXISTS "Allow users to update own profile" ON user_profiles;
+DROP POLICY IF EXISTS "Allow inserts for registration" ON user_profiles;
+DROP POLICY IF EXISTS "Allow all on user_profiles" ON user_profiles;
+CREATE POLICY "Allow all on user_profiles" ON user_profiles FOR ALL USING (true) WITH CHECK (true);
 
--- Policy to allow users to read all profiles
-CREATE POLICY "Allow users to read profiles" ON user_profiles
-  FOR SELECT USING (true);
-
--- Policy to allow users to update their own profile
-CREATE POLICY "Allow users to update own profile" ON user_profiles
-  FOR UPDATE USING (auth.uid() = id);
-
--- Policy to allow inserts (for registration)
-CREATE POLICY "Allow inserts for registration" ON user_profiles
-  FOR INSERT WITH CHECK (true);
-
--- Create user_invites table for admin invitations
+-- Create user_invites table
 CREATE TABLE IF NOT EXISTS user_invites (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -53,12 +47,31 @@ CREATE TABLE IF NOT EXISTS user_invites (
   used BOOLEAN DEFAULT FALSE
 );
 
--- Enable RLS for user_invites
 ALTER TABLE user_invites ENABLE ROW LEVEL SECURITY;
-
--- Policy to allow all operations on invites (admin-managed)
+DROP POLICY IF EXISTS "Allow all operations on invites" ON user_invites;
 CREATE POLICY "Allow all operations on invites" ON user_invites
   FOR ALL USING (true) WITH CHECK (true);
 
--- Auto-delete logs older than 6 months (run this as a cron job or scheduled function)
--- DELETE FROM activity_log WHERE created_at < NOW() - INTERVAL '6 months';
+-- =====================================================
+-- STEP 2: Run this AFTER Step 1 to add existing users
+-- =====================================================
+
+-- Add Matthew Kaleb (admin)
+INSERT INTO user_profiles (id, email, full_name, is_admin, created_at)
+SELECT id, email, 'Matthew Kaleb', true, created_at
+FROM auth.users WHERE email = 'matthew.kaleb1763@gmail.com'
+ON CONFLICT (email) DO UPDATE SET full_name = 'Matthew Kaleb', is_admin = true;
+
+-- Add Michael Dillon (if account exists)
+INSERT INTO user_profiles (id, email, full_name, is_admin, created_at)
+SELECT id, email, 'Michael Dillon', false, created_at
+FROM auth.users WHERE email = 'mdillon@hpvgproperties.com'
+ON CONFLICT (email) DO UPDATE SET full_name = 'Michael Dillon';
+
+-- =====================================================
+-- OPTIONAL: Update status column constraint if needed
+-- Run this if status changes are failing
+-- =====================================================
+
+-- Remove any CHECK constraint on status column (if it exists)
+-- ALTER TABLE waitlist_entries DROP CONSTRAINT IF EXISTS waitlist_entries_status_check;
