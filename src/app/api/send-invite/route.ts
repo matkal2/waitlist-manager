@@ -19,8 +19,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Get the base URL from the request
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://waitlist-manager-181gzrqgc-matthew-kalebs-projects.vercel.app';
+    // Get the base URL from the request headers (works in production)
+    const host = request.headers.get('host') || '';
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
     const registerUrl = `${baseUrl}/register?invite=${invite_id}`;
 
     // Use verified hpvgproperties.com domain
