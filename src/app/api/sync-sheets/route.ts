@@ -82,7 +82,8 @@ function extractUnitNumber(addressAndApt: string): string {
 
 export async function GET() {
   try {
-    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json`;
+    // Specify the DASH sheet explicitly
+    const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=DASH`;
     
     const response = await fetch(url, { 
       next: { revalidate: 60 } // Cache for 60 seconds
@@ -132,9 +133,24 @@ export async function GET() {
       if (status !== 'Available') continue;
       
       // Use unitTypeRaw if it contains text like "3BD + Den", otherwise use bedrooms number
-      const finalUnitType = unitTypeRaw && typeof unitTypeRaw === 'string' && unitTypeRaw.includes('BD') 
-        ? unitTypeRaw 
-        : bedroomsToUnitType(bedrooms);
+      let finalUnitType: string;
+      if (unitTypeRaw && typeof unitTypeRaw === 'string' && (unitTypeRaw.includes('BD') || unitTypeRaw.includes('BR') || unitTypeRaw.includes('Den'))) {
+        finalUnitType = unitTypeRaw;
+      } else if (bedrooms && bedrooms > 0) {
+        finalUnitType = bedroomsToUnitType(bedrooms);
+      } else {
+        // Fallback: infer from square footage if bedrooms is missing
+        // This handles cases where the bedrooms cell is empty but we have size data
+        if (sqFootage >= 1800) {
+          finalUnitType = '3BR'; // Large units (1800+ sqft) are likely 3BR+
+        } else if (sqFootage >= 1000) {
+          finalUnitType = '2BR';
+        } else if (sqFootage >= 600) {
+          finalUnitType = '1BR';
+        } else {
+          finalUnitType = 'Studio';
+        }
+      }
       
       const unit: SheetUnit = {
         property: mapPropertyName(propertyRaw),

@@ -67,13 +67,17 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      console.error('Error sending invite email:', error);
-      return NextResponse.json({ error: 'Failed to send email' }, { status: 500 });
+      console.error('Resend API error:', JSON.stringify(error, null, 2));
+      return NextResponse.json({ 
+        error: `Failed to send email: ${error.message || JSON.stringify(error)}` 
+      }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, messageId: data?.id });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in send-invite:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ 
+      error: `Internal server error: ${error?.message || 'Unknown error'}` 
+    }, { status: 500 });
   }
 }

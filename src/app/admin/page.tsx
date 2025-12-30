@@ -224,16 +224,17 @@ export default function AdminPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send invite email');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send invite email');
       }
 
       alert(`Invite sent to ${inviteForm.email}`);
       setInviteForm({ email: '', full_name: '' });
       setInviteOpen(false);
       fetchInvites();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending invite:', error);
-      alert('Failed to send invite. Please try again.');
+      alert(`Failed to send invite: ${error?.message || 'Please try again.'}`);
     } finally {
       setSending(false);
     }
