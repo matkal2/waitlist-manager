@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     try {
       const { data, error } = await resend.emails.send({
-        from: 'Waitlist Manager <onboarding@resend.dev>',
+        from: 'Waitlist Manager <noreply@hpvgproperties.com>',
         to: agentEmail,
         subject: `🔔 Match Alert: ${unit.property} Unit ${unit.unit_number} - ${contacts.length} people waiting`,
         html: `

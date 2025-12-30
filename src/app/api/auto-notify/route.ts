@@ -192,7 +192,7 @@ async function sendAgentEmail(agent: string, unit: SheetUnit, entries: WaitlistE
   `).join('');
 
   const { data, error } = await resend.emails.send({
-    from: 'Waitlist Manager <onboarding@resend.dev>',
+    from: 'Waitlist Manager <noreply@hpvgproperties.com>',
     to: agentEmail,
     subject: `🔔 NEW Match: ${unit.property} Unit ${unit.unit_number} - ${entries.length} people waiting`,
     html: `
