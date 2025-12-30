@@ -223,7 +223,7 @@ export default function Home() {
                     <span className="ml-3 text-muted-foreground">Loading entries...</span>
                   </div>
                 ) : (
-                  <WaitlistTable entries={entries} onRefresh={fetchEntries} />
+                  <WaitlistTable entries={entries} onRefresh={fetchEntries} currentUserEmail={user?.email} />
                 )}
               </CardContent>
             </Card>
