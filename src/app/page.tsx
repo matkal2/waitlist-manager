@@ -26,6 +26,13 @@ import { Building2, Users, Clock, Home as HomeIcon, Bell, LogOut, History, User,
 
 const ADMIN_EMAIL = 'mkaleb@hpvgproperties.com';
 
+// Map user emails to full names
+const EMAIL_TO_NAME: Record<string, string> = {
+  'mkaleb@hpvgproperties.com': 'Matthew Kaleb',
+  'mdillon@hpvgproperties.com': 'Michael Dillon',
+  'matthew.kaleb1763@gmail.com': 'Matthew Kaleb',
+};
+
 interface SheetUnit {
   property: string;
   unit_number: string;
@@ -178,7 +185,7 @@ export default function Home() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
                     <User className="h-4 w-4 mr-2" />
-                    {user?.email?.split('@')[0] || 'Account'}
+                    {user?.email ? (EMAIL_TO_NAME[user.email] || user.email.split('@')[0]) : 'Account'}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">

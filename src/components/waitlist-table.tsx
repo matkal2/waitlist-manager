@@ -405,9 +405,8 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
                         <Select
                           value={entry.status}
                           onValueChange={(value) => handleStatusChange(entry.id, value)}
-                          disabled={!canModify}
                         >
-                          <SelectTrigger className="w-[120px]">
+                          <SelectTrigger className="w-[150px] h-8">
                             <Badge variant={getStatusBadgeVariant(entry.status) as any}>
                               {entry.status}
                             </Badge>

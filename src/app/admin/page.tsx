@@ -24,6 +24,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Shield, UserPlus, Users, Mail, Trash2, ArrowLeft } from 'lucide-react';
 
 // Admin email - only this user can access admin features
@@ -34,7 +41,7 @@ interface UserProfile {
   email: string;
   full_name: string;
   created_at: string;
-  is_admin: boolean;
+  role: 'Admin' | 'General';
 }
 
 interface PendingInvite {
@@ -82,11 +89,59 @@ export default function AdminPage() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setUsers(data || []);
+      
+      // Map is_admin to role
+      const mappedUsers = (data || []).map(u => ({
+        ...u,
+        role: u.is_admin ? 'Admin' as const : 'General' as const
+      }));
+      setUsers(mappedUsers);
     } catch (error) {
       console.error('Error fetching users:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRoleChange = async (userId: string, newRole: 'Admin' | 'General') => {
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ is_admin: newRole === 'Admin' })
+        .eq('id', userId);
+
+      if (error) throw error;
+      
+      setUsers(users.map(u => 
+        u.id === userId ? { ...u, role: newRole } : u
+      ));
+    } catch (error) {
+      console.error('Error updating role:', error);
+      alert('Failed to update user role');
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, email: string) => {
+    if (email === ADMIN_EMAIL || email === 'matthew.kaleb1763@gmail.com') {
+      alert('Cannot delete the admin user');
+      return;
+    }
+    
+    if (!confirm(`Are you sure you want to delete ${email}? This will remove their access to the system.`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .delete()
+        .eq('id', userId);
+
+      if (error) throw error;
+      
+      setUsers(users.filter(u => u.id !== userId));
+      alert('User deleted successfully');
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert('Failed to delete user');
     }
   };
 
@@ -319,12 +374,12 @@ export default function AdminPage() {
               Registered Users
             </CardTitle>
             <CardDescription>
-              All users with access to the system
+              Manage user access and roles (Admin or General)
             </CardDescription>
           </CardHeader>
           <CardContent>
             {users.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No users registered</p>
+              <p className="text-center text-muted-foreground py-8">No users registered yet. Send invites to add users.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -333,6 +388,7 @@ export default function AdminPage() {
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Joined</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -341,14 +397,37 @@ export default function AdminPage() {
                       <TableCell className="font-medium">{userProfile.full_name}</TableCell>
                       <TableCell>{userProfile.email}</TableCell>
                       <TableCell>
-                        {userProfile.is_admin ? (
-                          <Badge className="bg-purple-100 text-purple-800">Admin</Badge>
-                        ) : (
-                          <Badge variant="secondary">Agent</Badge>
-                        )}
+                        <Select
+                          value={userProfile.role}
+                          onValueChange={(value) => handleRoleChange(userProfile.id, value as 'Admin' | 'General')}
+                          disabled={userProfile.email === ADMIN_EMAIL || userProfile.email === 'matthew.kaleb1763@gmail.com'}
+                        >
+                          <SelectTrigger className="w-[120px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Admin">
+                              <Badge className="bg-purple-100 text-purple-800">Admin</Badge>
+                            </SelectItem>
+                            <SelectItem value="General">
+                              <Badge variant="secondary">General</Badge>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell>
                         {new Date(userProfile.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-500 hover:text-red-700"
+                          onClick={() => handleDeleteUser(userProfile.id, userProfile.email)}
+                          disabled={userProfile.email === ADMIN_EMAIL || userProfile.email === 'matthew.kaleb1763@gmail.com'}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
