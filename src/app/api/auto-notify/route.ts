@@ -10,11 +10,10 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const SPREADSHEET_ID = '1OTm2nalt3DUBPzM_kQ4ZmiO0cs0dLUC2o72DYgoRA0U';
 
-// TEMPORARY: Using test email until domain is verified in Resend
-// TODO: Change back to production emails after DNS verification
+// Production agent emails
 const AGENT_EMAILS: Record<string, string> = {
-  'Matthew Kaleb': 'matthew.kaleb1763@gmail.com',
-  'Michael Dillon': 'matthew.kaleb1763@gmail.com', // Both go to test email for now
+  'Matthew Kaleb': 'mkaleb@hpvgproperties.com',
+  'Michael Dillon': 'mdillon@hpvgproperties.com',
 };
 
 interface SheetUnit {

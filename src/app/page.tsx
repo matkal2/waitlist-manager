@@ -14,7 +14,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Building2, Users, Clock, Home as HomeIcon, Bell, LogOut, History } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Building2, Users, Clock, Home as HomeIcon, Bell, LogOut, History, User, Key, Shield } from 'lucide-react';
+
+const ADMIN_EMAIL = 'mkaleb@hpvgproperties.com';
 
 interface SheetUnit {
   property: string;
@@ -100,14 +110,49 @@ export default function Home() {
     availableUnits: sheetUnits.length,
   };
 
-  // Calculate matches for the alert badge
+  // Calculate matches for the alert badge (must match property, unit type, AND move-in date)
   const matchCount = sheetUnits.reduce((count: number, unit: SheetUnit) => {
-    const matches = entries.filter(e => 
-      e.status === 'Active' &&
-      e.property === unit.property &&
-      e.unit_type_pref === unit.unit_type &&
-      (e.max_budget === 0 || unit.rent_price <= e.max_budget)
-    );
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const matches = entries.filter(e => {
+      if (e.status !== 'Active') return false;
+      if (e.property !== unit.property) return false;
+      if (e.unit_type_pref !== unit.unit_type) return false;
+      
+      // Check move-in date matching
+      const entryMoveInStart = new Date(e.move_in_date);
+      entryMoveInStart.setHours(0, 0, 0, 0);
+      const entryMoveInEnd = e.move_in_date_end 
+        ? new Date(e.move_in_date_end) 
+        : entryMoveInStart;
+      entryMoveInEnd.setHours(0, 0, 0, 0);
+      
+      const isAvailableNow = !unit.available_date || 
+        unit.available_date.toLowerCase() === 'now' || 
+        unit.available_date.toLowerCase() === 'available';
+      
+      if (isAvailableNow) {
+        // For units available "Now", only match entries wanting to move in within 30 days
+        const thirtyDaysFromNow = new Date(today);
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+        if (entryMoveInStart > thirtyDaysFromNow) return false;
+        if (entryMoveInEnd < today) return false;
+      } else {
+        const unitAvailable = new Date(unit.available_date!);
+        unitAvailable.setHours(0, 0, 0, 0);
+        if (e.move_in_date_end) {
+          if (unitAvailable > entryMoveInEnd) return false;
+        } else {
+          if (unitAvailable > entryMoveInStart) return false;
+        }
+      }
+      
+      // Budget is optional
+      if (e.max_budget > 0 && unit.rent_price > e.max_budget) return false;
+      
+      return true;
+    });
     return count + (matches.length > 0 ? 1 : 0);
   }, 0);
 
@@ -129,10 +174,33 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-3">
               <AddEntryForm onEntryAdded={fetchEntries} />
-              <Button variant="outline" size="sm" onClick={handleSignOut}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <User className="h-4 w-4 mr-2" />
+                    {user?.email?.split('@')[0] || 'Account'}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => router.push('/settings')}>
+                    <Key className="h-4 w-4 mr-2" />
+                    Change Password
+                  </DropdownMenuItem>
+                  {(user?.email === ADMIN_EMAIL || user?.email === 'matthew.kaleb1763@gmail.com') && (
+                    <DropdownMenuItem onClick={() => router.push('/admin')}>
+                      <Shield className="h-4 w-4 mr-2" />
+                      Admin Panel
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>

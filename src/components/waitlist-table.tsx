@@ -245,9 +245,9 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'Active': return 'default';
-      case 'Contacted': return 'secondary';
-      case 'Leased': return 'outline';
-      case 'Closed': return 'destructive';
+      case 'Showing Scheduled': return 'secondary';
+      case 'Applied': return 'outline';
+      case 'Signed Lease': return 'destructive';
       default: return 'default';
     }
   };
@@ -285,9 +285,9 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="Active">Active</SelectItem>
-            <SelectItem value="Contacted">Contacted</SelectItem>
-            <SelectItem value="Leased">Leased</SelectItem>
-            <SelectItem value="Closed">Closed</SelectItem>
+            <SelectItem value="Showing Scheduled">Showing Scheduled</SelectItem>
+            <SelectItem value="Applied">Applied</SelectItem>
+            <SelectItem value="Signed Lease">Signed Lease</SelectItem>
           </SelectContent>
         </Select>
 
@@ -414,9 +414,9 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Active">Active</SelectItem>
-                            <SelectItem value="Contacted">Contacted</SelectItem>
-                            <SelectItem value="Leased">Leased</SelectItem>
-                            <SelectItem value="Closed">Closed</SelectItem>
+                            <SelectItem value="Showing Scheduled">Showing Scheduled</SelectItem>
+                            <SelectItem value="Applied">Applied</SelectItem>
+                            <SelectItem value="Signed Lease">Signed Lease</SelectItem>
                           </SelectContent>
                         </Select>
                       </TableCell>
@@ -580,9 +580,9 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Contacted">Contacted</SelectItem>
-                  <SelectItem value="Leased">Leased</SelectItem>
-                  <SelectItem value="Closed">Closed</SelectItem>
+                  <SelectItem value="Showing Scheduled">Showing Scheduled</SelectItem>
+                  <SelectItem value="Applied">Applied</SelectItem>
+                  <SelectItem value="Signed Lease">Signed Lease</SelectItem>
                 </SelectContent>
               </Select>
             </div>

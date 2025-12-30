@@ -1,5 +1,5 @@
 export type EntryType = 'Internal Transfer' | 'Prospect';
-export type EntryStatus = 'Active' | 'Contacted' | 'Leased' | 'Closed';
+export type EntryStatus = 'Active' | 'Showing Scheduled' | 'Applied' | 'Signed Lease';
 export type FloorPreference = 'Ground' | 'Middle' | 'Top' | 'No Preference';
 
 export interface WaitlistEntry {
