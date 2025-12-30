@@ -106,15 +106,27 @@ export async function GET() {
       const propertyRaw = cells[0]?.v || '';
       const status = cells[5]?.v || '';
       const addressAndApt = cells[6]?.v || '';
-      const bedrooms = cells[7]?.v ?? cells[7]?.f ?? 0; // Try formatted value too
+      const bedrooms = cells[7]?.v ?? cells[7]?.f ?? null;
       const bathrooms = cells[8]?.v || 0;
       const sqFootage = cells[9]?.v || 0;
       const availableDateRaw = cells[10]?.v || null;
       const rentPrice = cells[11]?.v || 0;
       const uniqueId = cells[4]?.v || '';
       
-      // Also check for unit type in a different column (some sheets have it separately)
-      const unitTypeRaw = cells[12]?.v || cells[7]?.f || null; // Check column 12 or formatted value of 7
+      // Look for unit type in multiple possible columns
+      // Check col 13, 14, 15, 16, 17 for any text containing "BD" or bedroom info
+      let unitTypeRaw: string | null = null;
+      for (let i = 12; i <= 20; i++) {
+        const cellVal = cells[i]?.v || cells[i]?.f;
+        if (cellVal && typeof cellVal === 'string' && (cellVal.includes('BD') || cellVal.includes('BR') || cellVal.includes('Studio'))) {
+          unitTypeRaw = cellVal;
+          break;
+        }
+      }
+      // Also check formatted value of bedrooms column
+      if (!unitTypeRaw && cells[7]?.f && typeof cells[7].f === 'string') {
+        unitTypeRaw = cells[7].f;
+      }
       
       // Only include available units
       if (status !== 'Available') continue;
