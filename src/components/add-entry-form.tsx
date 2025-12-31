@@ -207,6 +207,7 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
                 <SelectContent>
                   <SelectItem value="Matthew Kaleb">Matthew Kaleb</SelectItem>
                   <SelectItem value="Michael Dillon">Michael Dillon</SelectItem>
+                  <SelectItem value="Unassigned">Unassigned Agent</SelectItem>
                 </SelectContent>
               </Select>
               {validationErrors.assigned_agent && (

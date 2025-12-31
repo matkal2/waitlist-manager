@@ -175,13 +175,27 @@ export default function AdminPage() {
 
   const fetchInvites = async () => {
     try {
-      const { data, error } = await supabase
+      // Get all invites
+      const { data: inviteData, error: inviteError } = await supabase
         .from('user_invites')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setInvites(data || []);
+      if (inviteError) throw inviteError;
+
+      // Get all registered user emails
+      const { data: profileData } = await supabase
+        .from('user_profiles')
+        .select('email');
+
+      const registeredEmails = new Set((profileData || []).map(p => p.email.toLowerCase()));
+
+      // Filter out invites for users who have already registered
+      const pendingInvites = (inviteData || []).filter(
+        invite => !registeredEmails.has(invite.email.toLowerCase())
+      );
+
+      setInvites(pendingInvites);
     } catch (error) {
       console.error('Error fetching invites:', error);
     }
