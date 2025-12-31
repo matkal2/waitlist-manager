@@ -80,33 +80,22 @@ function RegisterForm() {
     setError(null);
 
     try {
-      // Create Supabase auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: invite!.email,
-        password: password,
-        options: {
-          data: {
-            full_name: invite!.full_name,
-          },
-        },
+      // Use server-side API to create user with auto-confirmation
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: invite!.email,
+          password: password,
+          full_name: invite!.full_name,
+          invite_id: inviteId,
+        }),
       });
 
-      if (authError) throw authError;
+      const result = await response.json();
 
-      // Create user profile
-      if (authData.user) {
-        await supabase.from('user_profiles').insert({
-          id: authData.user.id,
-          email: invite!.email,
-          full_name: invite!.full_name,
-          is_admin: false,
-        });
-
-        // Mark invite as used
-        await supabase
-          .from('user_invites')
-          .update({ used: true })
-          .eq('id', inviteId);
+      if (!response.ok) {
+        throw new Error(result.error || 'Registration failed');
       }
 
       alert('Account created successfully! You can now log in.');
