@@ -54,6 +54,7 @@ export default function Home() {
   const [sheetUnits, setSheetUnits] = useState<SheetUnit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userFullName, setUserFullName] = useState<string | null>(null);
 
   const fetchEntries = useCallback(async () => {
     try {
@@ -87,6 +88,40 @@ export default function Home() {
   useEffect(() => {
     if (user) {
       fetchEntries();
+      
+      // Fetch user's full name from user_profiles or user metadata
+      const fetchUserName = async () => {
+        // First try user metadata (set during registration)
+        if (user.user_metadata?.full_name) {
+          setUserFullName(user.user_metadata.full_name);
+          return;
+        }
+        
+        // Then try EMAIL_TO_NAME map for known users
+        if (user.email && EMAIL_TO_NAME[user.email]) {
+          setUserFullName(EMAIL_TO_NAME[user.email]);
+          return;
+        }
+        
+        // Finally try user_profiles table
+        if (user.email) {
+          const { data } = await supabase
+            .from('user_profiles')
+            .select('full_name')
+            .eq('email', user.email)
+            .single();
+          
+          if (data?.full_name) {
+            setUserFullName(data.full_name);
+            return;
+          }
+        }
+        
+        // Fallback to email prefix
+        setUserFullName(user.email?.split('@')[0] || 'User');
+      };
+      
+      fetchUserName();
     }
   }, [fetchEntries, user]);
 
@@ -185,7 +220,7 @@ export default function Home() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
                     <User className="h-4 w-4 mr-2" />
-                    {user?.email ? (EMAIL_TO_NAME[user.email] || user.email.split('@')[0]) : 'Account'}
+                    {userFullName || 'Account'}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
