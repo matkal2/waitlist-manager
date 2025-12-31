@@ -25,12 +25,16 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
 
+    console.log('Attempting login for:', email);
     const { error } = await signIn(email, password);
 
     if (error) {
-      setError('Invalid email or password');
+      console.error('Login error:', error);
+      // Show more specific error message
+      setError(error.message || 'Invalid email or password');
       setLoading(false);
     } else {
+      console.log('Login successful');
       router.push('/');
     }
   };
