@@ -26,16 +26,25 @@ export default function LoginPage() {
     setLoading(true);
 
     console.log('Attempting login for:', email);
-    const { error } = await signIn(email, password);
+    
+    // Try direct Supabase call to debug
+    const { data, error: directError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    console.log('Direct Supabase result:', { data, error: directError });
 
-    if (error) {
-      console.error('Login error:', error);
-      // Show more specific error message
-      setError(error.message || 'Invalid email or password');
+    if (directError) {
+      console.error('Login error:', directError);
+      setError(directError.message || 'Invalid email or password');
       setLoading(false);
-    } else {
-      console.log('Login successful');
+    } else if (data?.user) {
+      console.log('Login successful, user:', data.user.email);
       router.push('/');
+    } else {
+      setError('Login failed - no user returned');
+      setLoading(false);
     }
   };
 
