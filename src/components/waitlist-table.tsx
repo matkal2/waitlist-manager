@@ -53,7 +53,7 @@ const PROPERTIES = [
   'W. Montrose', 'Warren'
 ];
 
-const AGENTS = ['Matthew Kaleb', 'Michael Dillon'];
+const AGENTS = ['Matthew Kaleb', 'Michael Dillon', 'Unassigned'];
 
 // Format date without timezone shift (parses YYYY-MM-DD as local date)
 const formatDateLocal = (dateString: string) => {
@@ -417,7 +417,12 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
                         </div>
                       </TableCell>
                       <TableCell>${entry.max_budget.toLocaleString()}</TableCell>
-                      <TableCell>{formatDateLocal(entry.move_in_date)}</TableCell>
+                      <TableCell>
+                        {formatDateLocal(entry.move_in_date)}
+                        {entry.move_in_date_end && (
+                          <span className="text-muted-foreground"> - {formatDateLocal(entry.move_in_date_end)}</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         {entry.assigned_agent ? (
                           <div className="flex items-center gap-1">
@@ -498,136 +503,196 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
           <DialogHeader>
             <DialogTitle>Edit Entry: {editingEntry?.full_name}</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Full Name</Label>
-              <Input
-                id="edit-name"
-                value={editForm.full_name || ''}
-                onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+          <div className="space-y-4 py-4">
+            {/* Entry Type Toggle */}
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="edit-is-transfer"
+                checked={editForm.entry_type === 'Internal Transfer'}
+                onChange={(e) => {
+                  const isTransfer = e.target.checked;
+                  setEditForm({ 
+                    ...editForm, 
+                    entry_type: isTransfer ? 'Internal Transfer' : 'Prospect',
+                    current_unit_number: isTransfer ? editForm.current_unit_number : ''
+                  });
+                }}
+                className="h-4 w-4 rounded border-gray-300"
               />
+              <Label htmlFor="edit-is-transfer">Current Resident (Internal Transfer)</Label>
             </div>
+
+            {/* Current Unit Number - only show for Internal Transfer */}
+            {editForm.entry_type === 'Internal Transfer' && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-current-unit">Current Unit Number</Label>
+                <Input
+                  id="edit-current-unit"
+                  value={editForm.current_unit_number || ''}
+                  onChange={(e) => setEditForm({ ...editForm, current_unit_number: e.target.value })}
+                  placeholder="e.g., 301"
+                />
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Full Name *</Label>
+                <Input
+                  id="edit-name"
+                  value={editForm.full_name || ''}
+                  onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Email</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editForm.email || ''}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-phone">Phone</Label>
+                <Input
+                  id="edit-phone"
+                  value={editForm.phone || ''}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-agent">Assigned Agent *</Label>
+                <Select
+                  value={editForm.assigned_agent || ''}
+                  onValueChange={(value) => setEditForm({ ...editForm, assigned_agent: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select agent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AGENTS.map(a => (
+                      <SelectItem key={a} value={a}>{a === 'Unassigned' ? 'Unassigned Agent' : a}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-property">Property *</Label>
+                <Select
+                  value={editForm.property || ''}
+                  onValueChange={(value) => setEditForm({ ...editForm, property: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select property" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROPERTIES.map(p => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-unit-type">Unit Type *</Label>
+                <Select
+                  value={editForm.unit_type_pref || ''}
+                  onValueChange={(value) => setEditForm({ ...editForm, unit_type_pref: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select unit type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Studio">Studio</SelectItem>
+                    <SelectItem value="1BR">1 Bedroom</SelectItem>
+                    <SelectItem value="2BR">2 Bedroom</SelectItem>
+                    <SelectItem value="3BR">3 Bedroom</SelectItem>
+                    <SelectItem value="4BR">4 Bedroom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-preferred-units">Preferred Unit Numbers</Label>
+                <Input
+                  id="edit-preferred-units"
+                  value={editForm.preferred_units || ''}
+                  onChange={(e) => setEditForm({ ...editForm, preferred_units: e.target.value })}
+                  placeholder="e.g., 101, 205, 310"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-floor-pref">Floor Preference</Label>
+                <Select
+                  value={editForm.floor_pref || 'No Preference'}
+                  onValueChange={(value) => setEditForm({ ...editForm, floor_pref: value as any })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select floor preference" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Ground">Ground</SelectItem>
+                    <SelectItem value="Middle">Middle</SelectItem>
+                    <SelectItem value="Top">Top</SelectItem>
+                    <SelectItem value="No Preference">No Preference</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-budget">Max Budget ($)</Label>
+                <Input
+                  id="edit-budget"
+                  type="number"
+                  value={editForm.max_budget || ''}
+                  onChange={(e) => setEditForm({ ...editForm, max_budget: parseInt(e.target.value) || 0 })}
+                  placeholder="2000"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-status">Status</Label>
+                <Select
+                  value={editForm.status || ''}
+                  onValueChange={(value) => setEditForm({ ...editForm, status: value as any })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Showing Scheduled">Showing Scheduled</SelectItem>
+                    <SelectItem value="Applied">Applied</SelectItem>
+                    <SelectItem value="Signed Lease">Signed Lease</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Move-in Date Section */}
             <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={editForm.email || ''}
-                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-move-in">Move-in Date {editForm.move_in_date_end ? '(Start)' : ''} *</Label>
+                  <Input
+                    id="edit-move-in"
+                    type="date"
+                    value={editForm.move_in_date || ''}
+                    onChange={(e) => setEditForm({ ...editForm, move_in_date: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-move-in-end">Move-in End Date (optional)</Label>
+                  <Input
+                    id="edit-move-in-end"
+                    type="date"
+                    value={editForm.move_in_date_end || ''}
+                    onChange={(e) => setEditForm({ ...editForm, move_in_date_end: e.target.value || null })}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Set an end date to create a move-in date range</p>
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="edit-phone">Phone</Label>
-              <Input
-                id="edit-phone"
-                value={editForm.phone || ''}
-                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-property">Property</Label>
-              <Select
-                value={editForm.property || ''}
-                onValueChange={(value) => setEditForm({ ...editForm, property: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select property" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PROPERTIES.map(p => (
-                    <SelectItem key={p} value={p}>{p}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-unit-type">Unit Type</Label>
-              <Select
-                value={editForm.unit_type_pref || ''}
-                onValueChange={(value) => setEditForm({ ...editForm, unit_type_pref: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select unit type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Studio">Studio</SelectItem>
-                  <SelectItem value="1BR">1 Bedroom</SelectItem>
-                  <SelectItem value="2BR">2 Bedroom</SelectItem>
-                  <SelectItem value="3BR">3 Bedroom</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-budget">Max Budget</Label>
-              <Input
-                id="edit-budget"
-                type="number"
-                value={editForm.max_budget || ''}
-                onChange={(e) => setEditForm({ ...editForm, max_budget: parseInt(e.target.value) || 0 })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-move-in">Move-in Date</Label>
-              <Input
-                id="edit-move-in"
-                type="date"
-                value={editForm.move_in_date || ''}
-                onChange={(e) => setEditForm({ ...editForm, move_in_date: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-agent">Assigned Agent</Label>
-              <Select
-                value={editForm.assigned_agent || ''}
-                onValueChange={(value) => setEditForm({ ...editForm, assigned_agent: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select agent" />
-                </SelectTrigger>
-                <SelectContent>
-                  {AGENTS.map(a => (
-                    <SelectItem key={a} value={a}>{a}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-status">Status</Label>
-              <Select
-                value={editForm.status || ''}
-                onValueChange={(value) => setEditForm({ ...editForm, status: value as any })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Showing Scheduled">Showing Scheduled</SelectItem>
-                  <SelectItem value="Applied">Applied</SelectItem>
-                  <SelectItem value="Signed Lease">Signed Lease</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-preferred-units">Preferred Units</Label>
-              <Input
-                id="edit-preferred-units"
-                value={editForm.preferred_units || ''}
-                onChange={(e) => setEditForm({ ...editForm, preferred_units: e.target.value })}
-                placeholder="e.g., 101, 205, 310"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-move-in-end">Move-in End Date (optional)</Label>
-              <Input
-                id="edit-move-in-end"
-                type="date"
-                value={editForm.move_in_date_end || ''}
-                onChange={(e) => setEditForm({ ...editForm, move_in_date_end: e.target.value || null })}
-              />
-              <p className="text-xs text-muted-foreground">Leave empty for single date</p>
-            </div>
-            <div className="col-span-2 space-y-2">
               <Label htmlFor="edit-notes">Internal Notes</Label>
               <textarea
                 id="edit-notes"
