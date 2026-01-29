@@ -69,7 +69,7 @@ export default function LoginPage() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
-              <Building2 className="h-12 w-12 text-primary" />
+              <img src="/highpoint-logo.png" alt="Highpoint Living" className="h-14 w-auto" />
             </div>
             <CardTitle className="text-2xl">Reset Password</CardTitle>
             <CardDescription>
@@ -138,7 +138,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <Building2 className="h-12 w-12 text-primary" />
+            <img src="/highpoint-logo.png" alt="Highpoint Living" className="h-14 w-auto" />
           </div>
           <CardTitle className="text-2xl">Waitlist Manager</CardTitle>
           <CardDescription>

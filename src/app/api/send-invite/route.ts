@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
     const registerUrl = `${baseUrl}/register?invite=${invite_id}`;
 
-    // Use verified hpvgproperties.com domain
+    // Use verified highpointliving.com domain
     const fromEmail = 'Waitlist Manager <noreply@hpvgproperties.com>';
     
     const { data, error } = await resend.emails.send({

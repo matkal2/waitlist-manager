@@ -1,0 +1,2 @@
+/*O_o*/
+google.visualization.Query.setResponse({"version":"0.6","reqId":"0","status":"ok","sig":"1945619023","table":{"cols":[{"id":"Col0","label":"","type":"string"}],"rows":[],"parsedNumHeaders":0}});

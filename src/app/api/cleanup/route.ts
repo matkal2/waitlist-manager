@@ -7,28 +7,53 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function GET() {
   try {
-    // Calculate date 2 months ago
-    const twoMonthsAgo = new Date();
-    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
-    const cutoffDate = twoMonthsAgo.toISOString().split('T')[0];
+    const today = new Date();
+    
+    // Calculate cutoff dates
+    // Standard retention: 1 month after move-in date
+    const oneMonthAgo = new Date(today);
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    const standardCutoff = oneMonthAgo.toISOString().split('T')[0];
+    
+    // Extended retention: 1 year after move-in date
+    const oneYearAgo = new Date(today);
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    const extendedCutoff = oneYearAgo.toISOString().split('T')[0];
 
-    // Find prospects (not transfers) with move-in date more than 2 months ago
-    const { data: expiredEntries, error: fetchError } = await supabase
+    // Fetch all prospect entries to check for expiration
+    const { data: allEntries, error: fetchError } = await supabase
       .from('waitlist_entries')
-      .select('id, full_name, move_in_date, entry_type')
-      .eq('entry_type', 'Prospect')
-      .lt('move_in_date', cutoffDate);
+      .select('id, full_name, move_in_date, move_in_date_end, entry_type, extended_retention')
+      .eq('entry_type', 'Prospect');
 
     if (fetchError) {
       throw fetchError;
     }
 
-    if (!expiredEntries || expiredEntries.length === 0) {
+    if (!allEntries || allEntries.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'No prospect entries found',
+        deleted: 0,
+      });
+    }
+
+    // Filter entries that should be deleted
+    // Delete 1 month after move_in_date_end (or move_in_date if no end date)
+    // If extended_retention is true, delete 1 year after instead
+    const expiredEntries = allEntries.filter(entry => {
+      const effectiveMoveInDate = entry.move_in_date_end || entry.move_in_date;
+      const cutoff = entry.extended_retention ? extendedCutoff : standardCutoff;
+      return effectiveMoveInDate < cutoff;
+    });
+
+    if (expiredEntries.length === 0) {
       return NextResponse.json({
         success: true,
         message: 'No expired entries found',
         deleted: 0,
-        cutoffDate,
+        standardCutoff,
+        extendedCutoff,
       });
     }
 
@@ -47,10 +72,13 @@ export async function GET() {
       success: true,
       message: `Deleted ${expiredEntries.length} expired prospect(s)`,
       deleted: expiredEntries.length,
-      cutoffDate,
+      standardCutoff,
+      extendedCutoff,
       deletedEntries: expiredEntries.map(e => ({
         name: e.full_name,
         move_in_date: e.move_in_date,
+        move_in_date_end: e.move_in_date_end,
+        extended_retention: e.extended_retention,
       })),
     });
   } catch (error) {

@@ -21,6 +21,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Plus } from 'lucide-react';
+import { PROPERTY_UNITS } from '@/lib/property-units';
 
 interface AddEntryFormProps {
   onEntryAdded: () => void;
@@ -30,6 +31,10 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
   const [open, setOpen] = useState(false);
   const [isCurrentResident, setIsCurrentResident] = useState(false);
   const [useDateRange, setUseDateRange] = useState(false);
+  const [isSection8, setIsSection8] = useState(false);
+  const [extendedRetention, setExtendedRetention] = useState(false);
+  const [selectedUnitTypes, setSelectedUnitTypes] = useState<string[]>([]);
+  const [selectedUnitNumbers, setSelectedUnitNumbers] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
@@ -80,8 +85,8 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
     if (!data.property || (data.property as string).trim() === '') {
       errors.property = 'Property is required';
     }
-    if (!data.unit_type_pref || (data.unit_type_pref as string).trim() === '') {
-      errors.unit_type_pref = 'Unit Type is required';
+    if (selectedUnitTypes.length === 0) {
+      errors.unit_type_pref = 'At least one Unit Type is required';
     }
     if (!data.move_in_date || (data.move_in_date as string).trim() === '') {
       errors.move_in_date = 'Move-in Date is required';
@@ -108,14 +113,16 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
         phone: data.phone as string,
         assigned_agent: (data.assigned_agent as string) || null,
         property: data.property as string,
-        unit_type_pref: data.unit_type_pref as string,
-        preferred_units: (data.preferred_units as string) || null,
+        unit_type_pref: selectedUnitTypes.join(', '),
+        preferred_units: selectedUnitNumbers.length > 0 ? selectedUnitNumbers.join(', ') : null,
         floor_pref: data.floor_pref as string,
         max_budget: data.max_budget ? Number(data.max_budget) : 0,
         move_in_date: data.move_in_date as string,
         move_in_date_end: useDateRange ? (data.move_in_date_end as string) || null : null,
         current_unit_number: (data.current_unit_number as string) || null,
         internal_notes: (data.internal_notes as string) || null,
+        is_section_8: isSection8,
+        extended_retention: extendedRetention,
       });
 
       if (error) throw error;
@@ -123,6 +130,10 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
       reset();
       setIsCurrentResident(false);
       setUseDateRange(false);
+      setIsSection8(false);
+      setExtendedRetention(false);
+      setSelectedUnitTypes([]);
+      setSelectedUnitNumbers([]);
       setOpen(false);
       onEntryAdded();
     } catch (error) {
@@ -146,15 +157,27 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
           <DialogTitle>Add New Waitlist Entry</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="isCurrentResident"
-              checked={isCurrentResident}
-              onChange={(e) => handleResidentToggle(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            <Label htmlFor="isCurrentResident">Current Resident (Internal Transfer)</Label>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="isCurrentResident"
+                checked={isCurrentResident}
+                onChange={(e) => handleResidentToggle(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="isCurrentResident">Current Resident (Internal Transfer)</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="isSection8"
+                checked={isSection8}
+                onChange={(e) => setIsSection8(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="isSection8">Section 8</Label>
+            </div>
           </div>
 
           {isCurrentResident && (
@@ -222,6 +245,7 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
               <Select onValueChange={(value) => {
                 setValue('property', value);
                 setValidationErrors(prev => ({ ...prev, property: '' }));
+                setSelectedUnitNumbers([]); // Reset unit numbers when property changes
               }}>
                 <SelectTrigger className={validationErrors.property ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Select property" />
@@ -255,39 +279,92 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
             </div>
 
             <div>
-              <Label htmlFor="unit_type_pref">Unit Type Preference *</Label>
-              <Select onValueChange={(value) => {
-                setValue('unit_type_pref', value);
-                setValidationErrors(prev => ({ ...prev, unit_type_pref: '' }));
-              }}>
-                <SelectTrigger className={validationErrors.unit_type_pref ? 'border-red-500' : ''}>
-                  <SelectValue placeholder="Select unit type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Studio">Studio</SelectItem>
-                  <SelectItem value="1BR">1BR</SelectItem>
-                  <SelectItem value="2BR">2BR</SelectItem>
-                  <SelectItem value="3BR">3BR</SelectItem>
-                  <SelectItem value="4BR">4BR</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Unit Type Preference * <span className="text-xs text-muted-foreground">(select all that apply)</span></Label>
+              <div className={`flex flex-wrap gap-3 mt-2 p-3 border rounded-md ${validationErrors.unit_type_pref ? 'border-red-500' : ''}`}>
+                {['Studio', '1BR', '2BR', '3BR', '4BR'].map(unitType => (
+                  <label key={unitType} className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedUnitTypes.includes(unitType)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedUnitTypes([...selectedUnitTypes, unitType]);
+                        } else {
+                          setSelectedUnitTypes(selectedUnitTypes.filter(t => t !== unitType));
+                        }
+                        setValidationErrors(prev => ({ ...prev, unit_type_pref: '' }));
+                      }}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <span className="text-sm">{unitType}</span>
+                  </label>
+                ))}
+              </div>
               {validationErrors.unit_type_pref && (
                 <p className="text-sm text-red-500 mt-1">{validationErrors.unit_type_pref}</p>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="preferred_units">Preferred Unit Numbers</Label>
-              <Input
-                id="preferred_units"
-                {...register('preferred_units')}
-                placeholder="e.g., 101, 205, 310"
-              />
-              <p className="text-xs text-muted-foreground mt-1">Separate multiple units with commas</p>
+          {/* Unit Numbers - only show if property is selected */}
+          {watch('property') && PROPERTY_UNITS[watch('property')] && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Unit Numbers <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                <Select
+                  value=""
+                  onValueChange={(value) => {
+                    if (value && !selectedUnitNumbers.includes(value)) {
+                      setSelectedUnitNumbers([...selectedUnitNumbers, value]);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select unit..." />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[200px]">
+                    {PROPERTY_UNITS[watch('property')].map(unit => (
+                      <SelectItem 
+                        key={unit} 
+                        value={unit}
+                        disabled={selectedUnitNumbers.includes(unit)}
+                      >
+                        {unit} {selectedUnitNumbers.includes(unit) ? '✓' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                {selectedUnitNumbers.length > 0 ? (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Selected Units</Label>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {selectedUnitNumbers.map(unit => (
+                        <span 
+                          key={unit} 
+                          className="inline-flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded text-sm"
+                        >
+                          {unit}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedUnitNumbers(selectedUnitNumbers.filter(u => u !== unit))}
+                            className="hover:text-red-500"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground mt-6">No units selected (matches all)</div>
+                )}
+              </div>
             </div>
+          )}
 
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="floor_pref">Floor Preference</Label>
               <Select
@@ -366,18 +443,33 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
               </div>
             )}
             
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="useDateRange"
-                checked={useDateRange}
-                onChange={(e) => setUseDateRange(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300"
-              />
-              <Label htmlFor="useDateRange" className="text-sm font-normal cursor-pointer">Use move-in date range</Label>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="useDateRange"
+                  checked={useDateRange}
+                  onChange={(e) => setUseDateRange(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="useDateRange" className="text-sm font-normal cursor-pointer">Use move-in date range</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="extendedRetention"
+                  checked={extendedRetention}
+                  onChange={(e) => setExtendedRetention(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="extendedRetention" className="text-sm font-normal cursor-pointer">Keep 1 year (instead of 1 month)</Label>
+              </div>
             </div>
             {useDateRange && (
               <p className="text-xs text-muted-foreground">Entry will match units available between start and end dates</p>
+            )}
+            {extendedRetention && (
+              <p className="text-xs text-muted-foreground">Entry will be retained for 1 year after move-in date instead of 1 month</p>
             )}
           </div>
 

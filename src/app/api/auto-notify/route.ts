@@ -14,6 +14,7 @@ const SPREADSHEET_ID = '1OTm2nalt3DUBPzM_kQ4ZmiO0cs0dLUC2o72DYgoRA0U';
 const AGENT_EMAILS: Record<string, string> = {
   'Matthew Kaleb': 'mkaleb@hpvgproperties.com',
   'Michael Dillon': 'mdillon@hpvgproperties.com',
+  'Unassigned': 'leasing@hpvgproperties.com',
 };
 
 interface SheetUnit {
@@ -35,8 +36,14 @@ interface WaitlistEntry {
   unit_type_pref: string;
   max_budget: number;
   move_in_date: string;
+  move_in_date_end: string | null;
   assigned_agent: string | null;
   status: string;
+}
+
+interface MatchedEntry extends WaitlistEntry {
+  matchType: 'exact' | 'flexible';
+  flexibilityNote?: string;
 }
 
 function parseGoogleDate(dateStr: string | null): string | null {
@@ -52,19 +59,20 @@ function parseGoogleDate(dateStr: string | null): string | null {
 }
 
 function mapPropertyName(name: string): string {
+  // Maps Google Sheet property codes to standard nicknames (must match properties.ts)
   const mapping: Record<string, string> = {
     'Broadway': 'Broadway',
     'Countryside_T': 'Countryside T',
     'Countryside_C': 'Countryside C',
     'Fullerton': 'Fullerton',
-    'Green_Bay_246': '246 Green Bay',
-    'Green_Bay_440': '440 Green Bay',
-    'Green_Bay_546': '546 Green Bay',
+    'Green_Bay_246': 'Green Bay 246',
+    'Green_Bay_440': 'Green Bay 440',
+    'Green_Bay_546': 'Green Bay 546',
     'Greenleaf': 'Greenleaf',
     'Kedzie': 'Kedzie',
     'Kennedy': 'Kennedy',
     'Liberty': 'Liberty',
-    'N_Clark': 'N. Clark',
+    'N_Clark': 'North Clark',
     'Park': 'Park',
     'Rogers': 'Rogers',
     'Sheffield': 'Sheffield',
@@ -171,69 +179,162 @@ function generateMatchKey(unitId: string, agent: string): string {
   return `${unitId}:${agent}`;
 }
 
-async function sendAgentEmail(agent: string, unit: SheetUnit, entries: WaitlistEntry[]) {
+interface UnitWithMatches {
+  unit: SheetUnit;
+  entries: MatchedEntry[];
+}
+
+async function sendConsolidatedAgentEmail(agent: string, unitMatches: UnitWithMatches[]) {
   const agentEmail = AGENT_EMAILS[agent];
   if (!agentEmail) return null;
 
-  const contactListHtml = entries.map((c, idx) => `
-    <tr style="border-bottom: 1px solid #eee;">
-      <td style="padding: 12px 8px;">${idx + 1}</td>
-      <td style="padding: 12px 8px;">
-        <strong>${c.full_name}</strong>
-        <span style="background: ${c.entry_type === 'Internal Transfer' ? '#2563eb' : '#6b7280'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 8px;">
-          ${c.entry_type === 'Internal Transfer' ? '🏠 Transfer' : '👤 Prospect'}
-        </span>
-      </td>
-      <td style="padding: 12px 8px;">${c.email || 'N/A'}</td>
-      <td style="padding: 12px 8px;">${c.phone || 'N/A'}</td>
-      <td style="padding: 12px 8px;">$${c.max_budget > 0 ? c.max_budget.toLocaleString() : 'Any'}</td>
-      <td style="padding: 12px 8px;">${new Date(c.move_in_date).toLocaleDateString()}</td>
-    </tr>
-  `).join('');
+  const totalMatches = unitMatches.reduce((sum, um) => sum + um.entries.length, 0);
+  const totalUnits = unitMatches.length;
 
-  const { data, error } = await resend.emails.send({
-    from: 'Waitlist Manager <noreply@hpvgproperties.com>',
-    to: agentEmail,
-    subject: `🔔 NEW Match: ${unit.property} Unit ${unit.unit_number} - ${entries.length} people waiting`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto;">
-        <h2 style="color: #333;">🔔 Automatic Match Alert</h2>
-        <p>A unit just became available with <strong>${entries.length}</strong> matching waitlist ${entries.length === 1 ? 'entry' : 'entries'}:</p>
+  // Generate HTML for each unit section
+  const unitsHtml = unitMatches.map((um, unitIdx) => {
+    const { unit, entries } = um;
+    
+    const contactListHtml = entries.map((c, idx) => {
+      const moveInDisplay = c.move_in_date_end 
+        ? `${new Date(c.move_in_date).toLocaleDateString()} - ${new Date(c.move_in_date_end).toLocaleDateString()}`
+        : new Date(c.move_in_date).toLocaleDateString();
+      
+      const flexibilityBadge = c.matchType === 'flexible' 
+        ? `<div style="background: #fef3c7; color: #92400e; padding: 4px 8px; border-radius: 4px; font-size: 11px; margin-top: 4px;">⚠️ ${c.flexibilityNote}</div>`
+        : '';
+      
+      return `
+      <tr style="border-bottom: 1px solid #eee;">
+        <td style="padding: 10px 8px;">${idx + 1}</td>
+        <td style="padding: 10px 8px;">
+          <strong>${c.full_name}</strong>
+          <span style="background: ${c.entry_type === 'Internal Transfer' ? '#2563eb' : '#6b7280'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 8px;">
+            ${c.entry_type === 'Internal Transfer' ? '🏠 Transfer' : '👤 Prospect'}
+          </span>
+        </td>
+        <td style="padding: 10px 8px;">${c.email || 'N/A'}</td>
+        <td style="padding: 10px 8px;">${c.phone || 'N/A'}</td>
+        <td style="padding: 10px 8px;">$${c.max_budget > 0 ? c.max_budget.toLocaleString() : 'Any'}</td>
+        <td style="padding: 10px 8px;">
+          ${moveInDisplay}
+          ${flexibilityBadge}
+        </td>
+      </tr>
+    `;
+    }).join('');
+
+    return `
+      <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb;">
+        <h3 style="margin-top: 0; color: #2563eb;">${unitIdx + 1}. ${unit.property} - Unit ${unit.unit_number}</h3>
+        <p style="margin: 5px 0;"><strong>Type:</strong> ${unit.unit_type} | <strong>Rent:</strong> $${unit.rent_price.toLocaleString()}/mo | <strong>Available:</strong> ${unit.available_date ? new Date(unit.available_date).toLocaleDateString() : 'Now'}</p>
         
-        <div style="background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb;">
-          <h3 style="margin-top: 0; color: #2563eb;">${unit.property} - Unit ${unit.unit_number}</h3>
-          <p style="margin: 5px 0;"><strong>Type:</strong> ${unit.unit_type}</p>
-          <p style="margin: 5px 0;"><strong>Rent:</strong> $${unit.rent_price.toLocaleString()}/month</p>
-          <p style="margin: 5px 0;"><strong>Available:</strong> ${unit.available_date ? new Date(unit.available_date).toLocaleDateString() : 'Now'}</p>
-        </div>
-        
-        <h3 style="color: #333; margin-top: 30px;">People to Contact (Priority Order):</h3>
-        <p style="color: #666; font-size: 14px;">Internal Transfers are listed first per the "Transfer First" policy.</p>
-        
-        <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+        <table style="width: 100%; border-collapse: collapse; margin-top: 15px; background: white;">
           <thead>
             <tr style="background: #f5f5f5;">
-              <th style="padding: 12px 8px; text-align: left;">#</th>
-              <th style="padding: 12px 8px; text-align: left;">Name</th>
-              <th style="padding: 12px 8px; text-align: left;">Email</th>
-              <th style="padding: 12px 8px; text-align: left;">Phone</th>
-              <th style="padding: 12px 8px; text-align: left;">Budget</th>
-              <th style="padding: 12px 8px; text-align: left;">Move-in</th>
+              <th style="padding: 10px 8px; text-align: left; font-size: 12px;">#</th>
+              <th style="padding: 10px 8px; text-align: left; font-size: 12px;">Name</th>
+              <th style="padding: 10px 8px; text-align: left; font-size: 12px;">Email</th>
+              <th style="padding: 10px 8px; text-align: left; font-size: 12px;">Phone</th>
+              <th style="padding: 10px 8px; text-align: left; font-size: 12px;">Budget</th>
+              <th style="padding: 10px 8px; text-align: left; font-size: 12px;">Move-in</th>
             </tr>
           </thead>
           <tbody>
             ${contactListHtml}
           </tbody>
         </table>
+      </div>
+    `;
+  }).join('');
+
+  const { data, error } = await resend.emails.send({
+    from: 'Waitlist Manager <noreply@hpvgproperties.com>',
+    to: agentEmail,
+    subject: `🔔 Match Alert: ${totalUnits} unit${totalUnits > 1 ? 's' : ''} with ${totalMatches} waitlist match${totalMatches > 1 ? 'es' : ''}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto;">
+        <h2 style="color: #333;">🔔 Waitlist Match Alert</h2>
+        <p>You have <strong>${totalMatches}</strong> waitlist ${totalMatches === 1 ? 'entry' : 'entries'} matching <strong>${totalUnits}</strong> available ${totalUnits === 1 ? 'unit' : 'units'}:</p>
+        
+        <p style="color: #666; font-size: 14px;">Internal Transfers are listed first per the "Transfer First" policy.</p>
+        
+        ${unitsHtml}
+        
+        <div style="margin-top: 30px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
+          <p style="margin: 0; font-size: 14px;"><strong>Next Steps:</strong></p>
+          <ol style="margin: 10px 0 0 0; padding-left: 20px; font-size: 14px; color: #666;">
+            <li>Contact waitlist entries in priority order (transfers first)</li>
+            <li>Mark contacted entries in the Waitlist Manager</li>
+            <li>Update entry status when they schedule, apply, or sign</li>
+          </ol>
+        </div>
         
         <p style="color: #666; font-size: 12px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-          This is an automated notification from the Waitlist Manager system.
+          This is an automated notification from the Waitlist Manager system.<br/>
+          <a href="https://waitlist-hpvg.vercel.app/waitlist" style="color: #2563eb;">Open Waitlist Manager →</a>
         </p>
       </div>
     `,
   });
 
   return { data, error, agentEmail };
+}
+
+// Helper function to check date match and return match type
+function checkDateMatch(entry: WaitlistEntry, unit: SheetUnit, today: Date): { matches: boolean; matchType: 'exact' | 'flexible'; flexibilityNote?: string } {
+  const entryMoveInStart = new Date(entry.move_in_date);
+  entryMoveInStart.setHours(0, 0, 0, 0);
+  const entryMoveInEnd = entry.move_in_date_end 
+    ? new Date(entry.move_in_date_end) 
+    : entryMoveInStart;
+  entryMoveInEnd.setHours(0, 0, 0, 0);
+  
+  // Determine unit availability date
+  let unitAvailable: Date;
+  const isAvailableNow = !unit.available_date || 
+    unit.available_date.toLowerCase() === 'now' || 
+    unit.available_date.toLowerCase() === 'available';
+  
+  if (isAvailableNow) {
+    unitAvailable = today;
+  } else {
+    unitAvailable = new Date(unit.available_date!);
+    unitAvailable.setHours(0, 0, 0, 0);
+  }
+  
+  // Calculate 1-month flexibility windows
+  const oneMonthBeforeStart = new Date(entryMoveInStart);
+  oneMonthBeforeStart.setDate(oneMonthBeforeStart.getDate() - 30);
+  const oneMonthAfterEnd = new Date(entryMoveInEnd);
+  oneMonthAfterEnd.setDate(oneMonthAfterEnd.getDate() + 30);
+  
+  // Check if unit is within the exact range
+  const isExactMatch = unitAvailable >= entryMoveInStart && unitAvailable <= entryMoveInEnd;
+  
+  // Check if unit is within 1 month before the range
+  const isBeforeRange = unitAvailable >= oneMonthBeforeStart && unitAvailable < entryMoveInStart;
+  
+  // Check if unit is within 1 month after the range
+  const isAfterRange = unitAvailable > entryMoveInEnd && unitAvailable <= oneMonthAfterEnd;
+  
+  if (isExactMatch) {
+    return { matches: true, matchType: 'exact' };
+  } else if (isBeforeRange) {
+    return { 
+      matches: true, 
+      matchType: 'flexible', 
+      flexibilityNote: `Unit available before requested range (${new Date(unit.available_date!).toLocaleDateString()})` 
+    };
+  } else if (isAfterRange) {
+    return { 
+      matches: true, 
+      matchType: 'flexible', 
+      flexibilityNote: `Unit available after requested range (${new Date(unit.available_date!).toLocaleDateString()})` 
+    };
+  }
+  
+  return { matches: false, matchType: 'exact' };
 }
 
 export async function GET() {
@@ -245,34 +346,51 @@ export async function GET() {
       getNotifiedMatches(),
     ]);
 
-    const notifications: { agent: string; unit: string; contacts: number; success: boolean }[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    // Find matches and send notifications for new ones
+    // Build a map of agent -> unit matches (consolidated per agent)
+    const agentUnitMatches: Record<string, UnitWithMatches[]> = {};
+    const newMatchKeys: { key: string; agent: string; unitId: string; entryIds: string[] }[] = [];
+
     for (const unit of units) {
-      const matchingEntries = entries.filter(entry => {
-        if (entry.property !== unit.property) return false;
-        if (entry.unit_type_pref !== unit.unit_type) return false;
-        if (entry.max_budget > 0 && unit.rent_price > entry.max_budget) return false;
-        return true;
-      });
+      const matchingEntries: MatchedEntry[] = entries
+        .filter(entry => {
+          // ===== MANDATORY MATCHES =====
+          if (entry.property !== unit.property) return false;
+          const entryUnitTypes = entry.unit_type_pref.split(',').map(t => t.trim());
+          if (!entryUnitTypes.includes(unit.unit_type)) return false;
+          const dateCheck = checkDateMatch(entry, unit, today);
+          if (!dateCheck.matches) return false;
+          // ===== OPTIONAL MATCHES =====
+          if (entry.max_budget > 0 && unit.rent_price > entry.max_budget) return false;
+          return true;
+        })
+        .map(entry => {
+          const dateCheck = checkDateMatch(entry, unit, today);
+          return {
+            ...entry,
+            matchType: dateCheck.matchType,
+            flexibilityNote: dateCheck.flexibilityNote,
+          };
+        });
 
       if (matchingEntries.length === 0) continue;
 
-      // Group by agent
-      const entriesByAgent: Record<string, WaitlistEntry[]> = {};
+      // Group entries by agent
+      const entriesByAgent: Record<string, MatchedEntry[]> = {};
       matchingEntries.forEach(e => {
         const agent = e.assigned_agent || 'Unassigned';
-        if (agent === 'Unassigned') return;
         if (!entriesByAgent[agent]) entriesByAgent[agent] = [];
         entriesByAgent[agent].push(e);
       });
 
-      // Send notifications for each agent if not already notified
+      // Add to consolidated agent map (only if not already notified)
       for (const [agent, agentEntries] of Object.entries(entriesByAgent)) {
         const matchKey = generateMatchKey(unit.unique_id, agent);
         
         if (notifiedMatches.has(matchKey)) {
-          continue; // Already notified
+          continue; // Already notified for this unit/agent combo
         }
 
         // Sort entries: Internal Transfers first
@@ -283,32 +401,49 @@ export async function GET() {
           return 0;
         });
 
-        // Send email
-        const result = await sendAgentEmail(agent, unit, agentEntries);
+        // Add to consolidated map
+        if (!agentUnitMatches[agent]) agentUnitMatches[agent] = [];
+        agentUnitMatches[agent].push({ unit, entries: agentEntries });
         
-        if (result && !result.error) {
-          // Record the notification
-          await recordNotifiedMatch(
-            matchKey,
-            agent,
-            unit.unique_id,
-            agentEntries.map(e => e.id)
-          );
-          
-          notifications.push({
-            agent,
-            unit: `${unit.property} ${unit.unit_number}`,
-            contacts: agentEntries.length,
-            success: true,
-          });
-        } else {
-          notifications.push({
-            agent,
-            unit: `${unit.property} ${unit.unit_number}`,
-            contacts: agentEntries.length,
-            success: false,
-          });
+        // Track the match key for recording after email is sent
+        newMatchKeys.push({
+          key: matchKey,
+          agent,
+          unitId: unit.unique_id,
+          entryIds: agentEntries.map(e => e.id),
+        });
+      }
+    }
+
+    // Send ONE consolidated email per agent with ALL their matches
+    const notifications: { agent: string; unitsCount: number; totalContacts: number; success: boolean }[] = [];
+
+    for (const [agent, unitMatches] of Object.entries(agentUnitMatches)) {
+      if (unitMatches.length === 0) continue;
+
+      const result = await sendConsolidatedAgentEmail(agent, unitMatches);
+      const totalContacts = unitMatches.reduce((sum, um) => sum + um.entries.length, 0);
+      
+      if (result && !result.error) {
+        // Record all match keys for this agent
+        const agentMatchKeys = newMatchKeys.filter(mk => mk.agent === agent);
+        for (const mk of agentMatchKeys) {
+          await recordNotifiedMatch(mk.key, mk.agent, mk.unitId, mk.entryIds);
         }
+        
+        notifications.push({
+          agent,
+          unitsCount: unitMatches.length,
+          totalContacts,
+          success: true,
+        });
+      } else {
+        notifications.push({
+          agent,
+          unitsCount: unitMatches.length,
+          totalContacts,
+          success: false,
+        });
       }
     }
 
@@ -317,7 +452,7 @@ export async function GET() {
       checked: new Date().toISOString(),
       unitsChecked: units.length,
       entriesChecked: entries.length,
-      notificationsSent: notifications.filter(n => n.success).length,
+      emailsSent: notifications.filter(n => n.success).length,
       notifications,
     });
   } catch (error) {

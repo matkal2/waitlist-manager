@@ -26,9 +26,14 @@ interface SheetsMatchAlertsProps {
   waitlistEntries: WaitlistEntry[];
 }
 
+interface MatchedEntry extends WaitlistEntry {
+  matchType: 'exact' | 'flexible';
+  flexibilityNote?: string;
+}
+
 interface Match {
   unit: SheetUnit;
-  entries: WaitlistEntry[];
+  entries: MatchedEntry[];
 }
 
 export function SheetsMatchAlerts({ units, waitlistEntries }: SheetsMatchAlertsProps) {
@@ -41,14 +46,8 @@ export function SheetsMatchAlerts({ units, waitlistEntries }: SheetsMatchAlertsP
     today.setHours(0, 0, 0, 0);
 
     for (const unit of units) {
-      const matchingEntries = activeEntries.filter(entry => {
-        // Match by property (required)
-        if (entry.property !== unit.property) return false;
-        
-        // Match by unit type (required)
-        if (entry.unit_type_pref !== unit.unit_type) return false;
-        
-        // Match by move-in date (required)
+      // Helper function to check date match and return match type
+      const checkDateMatch = (entry: WaitlistEntry): { matches: boolean; matchType: 'exact' | 'flexible'; flexibilityNote?: string } => {
         const entryMoveInStart = new Date(entry.move_in_date);
         entryMoveInStart.setHours(0, 0, 0, 0);
         const entryMoveInEnd = entry.move_in_date_end 
@@ -64,40 +63,81 @@ export function SheetsMatchAlerts({ units, waitlistEntries }: SheetsMatchAlertsP
         
         if (isAvailableNow) {
           unitAvailable = today;
-          // For units available "Now", only match entries wanting to move in within 30 days
-          const thirtyDaysFromNow = new Date(today);
-          thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-          
-          // Entry's move-in range should overlap with now to 30 days from now
-          if (entryMoveInStart > thirtyDaysFromNow) return false;
-          if (entryMoveInEnd < today) return false;
         } else {
           unitAvailable = new Date(unit.available_date!);
           unitAvailable.setHours(0, 0, 0, 0);
+        }
+        
+        // Calculate 1-month flexibility windows
+        const oneMonthBeforeStart = new Date(entryMoveInStart);
+        oneMonthBeforeStart.setDate(oneMonthBeforeStart.getDate() - 30);
+        const oneMonthAfterEnd = new Date(entryMoveInEnd);
+        oneMonthAfterEnd.setDate(oneMonthAfterEnd.getDate() + 30);
+        
+        // Check if unit is within the exact range
+        const isExactMatch = unitAvailable >= entryMoveInStart && unitAvailable <= entryMoveInEnd;
+        
+        // Check if unit is within 1 month before the range
+        const isBeforeRange = unitAvailable >= oneMonthBeforeStart && unitAvailable < entryMoveInStart;
+        
+        // Check if unit is within 1 month after the range
+        const isAfterRange = unitAvailable > entryMoveInEnd && unitAvailable <= oneMonthAfterEnd;
+        
+        if (isExactMatch) {
+          return { matches: true, matchType: 'exact' };
+        } else if (isBeforeRange) {
+          return { 
+            matches: true, 
+            matchType: 'flexible', 
+            flexibilityNote: `Unit available before requested range` 
+          };
+        } else if (isAfterRange) {
+          return { 
+            matches: true, 
+            matchType: 'flexible', 
+            flexibilityNote: `Unit available after requested range` 
+          };
+        }
+        
+        return { matches: false, matchType: 'exact' };
+      };
+
+      const matchingEntries: MatchedEntry[] = activeEntries
+        .filter(entry => {
+          // ===== MANDATORY MATCHES =====
           
-          // Check if unit availability falls within entry's desired move-in range
-          // Entry should be looking to move in on or after unit is available
-          // and entry's start date should not be too far in the future from unit availability
-          if (entry.move_in_date_end) {
-            // Entry has a range: unit available date should fall within or before the range
-            if (unitAvailable > entryMoveInEnd) return false;
-          } else {
-            // Entry has single date: unit should be available on or before entry's move-in date
-            if (unitAvailable > entryMoveInStart) return false;
+          // Match by property (required)
+          if (entry.property !== unit.property) return false;
+          
+          // Match by unit type (required) - supports multiple unit types (comma-separated)
+          const entryUnitTypes = entry.unit_type_pref.split(',').map(t => t.trim());
+          if (!entryUnitTypes.includes(unit.unit_type)) return false;
+          
+          // Match by move-in date (required) - with 1 month flexibility
+          const dateCheck = checkDateMatch(entry);
+          if (!dateCheck.matches) return false;
+          
+          // ===== OPTIONAL MATCHES (only apply if specified) =====
+          
+          // Match by preferred unit numbers (optional - only filter if specified)
+          if (entry.preferred_units && entry.preferred_units.trim() !== '') {
+            const preferredList = entry.preferred_units.split(',').map(u => u.trim().toLowerCase());
+            if (!preferredList.includes(unit.unit_number.toLowerCase())) return false;
           }
-        }
-        
-        // Match by budget (optional - only filter if budget is set)
-        if (entry.max_budget > 0 && unit.rent_price > entry.max_budget) return false;
-        
-        // Match by preferred units (optional - only filter if specified)
-        if (entry.preferred_units) {
-          const preferredList = entry.preferred_units.split(',').map(u => u.trim().toLowerCase());
-          if (!preferredList.includes(unit.unit_number.toLowerCase())) return false;
-        }
-        
-        return true;
-      });
+          
+          // Match by max budget (optional - only filter if budget is set)
+          if (entry.max_budget > 0 && unit.rent_price > entry.max_budget) return false;
+          
+          return true;
+        })
+        .map(entry => {
+          const dateCheck = checkDateMatch(entry);
+          return {
+            ...entry,
+            matchType: dateCheck.matchType,
+            flexibilityNote: dateCheck.flexibilityNote,
+          };
+        });
 
       if (matchingEntries.length > 0) {
         // Sort: Internal Transfers first, then by created_at
@@ -115,7 +155,7 @@ export function SheetsMatchAlerts({ units, waitlistEntries }: SheetsMatchAlertsP
     return matches;
   };
 
-  const handleSendNotification = async (unit: SheetUnit, entries: WaitlistEntry[]) => {
+  const handleSendNotification = async (unit: SheetUnit, entries: MatchedEntry[]) => {
     setSendingNotifications(prev => [...prev, unit.unique_id]);
     
     try {
@@ -224,14 +264,6 @@ export function SheetsMatchAlerts({ units, waitlistEntries }: SheetsMatchAlertsP
                     </span>
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => handleSendNotification(unit, entries)}
-                  disabled={sendingNotifications.includes(unit.unique_id)}
-                >
-                  <Mail className="mr-2 h-4 w-4" />
-                  {sendingNotifications.includes(unit.unique_id) ? 'Sending...' : 'Notify All'}
-                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -269,6 +301,11 @@ export function SheetsMatchAlerts({ units, waitlistEntries }: SheetsMatchAlertsP
                           )}
                           <span>Budget: ${entry.max_budget > 0 ? entry.max_budget.toLocaleString() : 'Any'}</span>
                           <span>Agent: {entry.assigned_agent || 'Open'}</span>
+                          {entry.matchType === 'flexible' && (
+                            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
+                              ⚠️ {entry.flexibilityNote}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </div>

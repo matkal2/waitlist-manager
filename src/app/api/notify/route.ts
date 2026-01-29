@@ -7,6 +7,15 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const AGENT_EMAILS: Record<string, string> = {
   'Matthew Kaleb': 'mkaleb@hpvgproperties.com',
   'Michael Dillon': 'mdillon@hpvgproperties.com',
+  'Unassigned': 'leasing@hpvgproperties.com',
+};
+
+// Helper to get agent email with fallback to leasing for unassigned
+const getAgentEmail = (agent: string | null | undefined): string => {
+  if (!agent || agent === '' || agent === 'Unassigned') {
+    return AGENT_EMAILS['Unassigned'];
+  }
+  return AGENT_EMAILS[agent] || AGENT_EMAILS['Unassigned'];
 };
 
 interface WaitlistContact {
@@ -35,10 +44,8 @@ export async function POST(request: NextRequest) {
     const body: NotifyRequest = await request.json();
     const { unit, agent, contacts } = body;
 
-    const agentEmail = AGENT_EMAILS[agent];
-    if (!agentEmail) {
-      return NextResponse.json({ error: `No email configured for agent: ${agent}` }, { status: 400 });
-    }
+    const agentEmail = getAgentEmail(agent);
+    const displayAgent = agent || 'Unassigned';
 
     if (!contacts || contacts.length === 0) {
       return NextResponse.json({ error: 'No contacts provided' }, { status: 400 });
@@ -115,7 +122,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `Email sent to ${agent} (${agentEmail})`,
+        message: `Email sent to ${displayAgent} (${agentEmail})`,
         emailId: data?.id,
         agentEmail,
         contactCount: contacts.length,

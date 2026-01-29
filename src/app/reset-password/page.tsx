@@ -88,7 +88,7 @@ export default function ResetPasswordPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <Building2 className="h-12 w-12 mx-auto text-primary mb-2" />
+            <img src="/highpoint-logo.png" alt="Highpoint Living" className="h-14 w-auto mx-auto mb-2" />
             <CardTitle>Invalid Reset Link</CardTitle>
             <CardDescription>
               This password reset link is invalid or has expired.
@@ -108,7 +108,7 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <Building2 className="h-12 w-12 mx-auto text-primary mb-2" />
+          <img src="/highpoint-logo.png" alt="Highpoint Living" className="h-14 w-auto mx-auto mb-2" />
           <CardTitle>Set New Password</CardTitle>
           <CardDescription>
             Enter your new password below

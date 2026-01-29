@@ -124,7 +124,7 @@ function RegisterForm() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <Building2 className="h-12 w-12 mx-auto text-primary mb-2" />
+            <img src="/highpoint-logo.png" alt="Highpoint Living" className="h-14 w-auto mx-auto mb-2" />
             <CardTitle>Invalid Invite</CardTitle>
           </CardHeader>
           <CardContent>
@@ -142,7 +142,7 @@ function RegisterForm() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <Building2 className="h-12 w-12 mx-auto text-primary mb-2" />
+          <img src="/highpoint-logo.png" alt="Highpoint Living" className="h-14 w-auto mx-auto mb-2" />
           <CardTitle>Create Your Account</CardTitle>
           <CardDescription>
             Welcome, {invite?.full_name}! Set up your password to complete registration.

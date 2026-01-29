@@ -30,13 +30,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Plus, Trash2, Home } from 'lucide-react';
+import { getPropertyNicknames } from '@/lib/properties';
 
-const PROPERTIES = [
-  '246 Green Bay', '440 Green Bay', '546 Green Bay', 'Broadway', 'Countryside C',
-  'Countryside T', 'Elston', 'Fullerton', 'Greenleaf', 'Kedzie', 'Kennedy',
-  'Liberty', 'N. Clark', 'Park', 'Rogers', 'Sheffield', 'Talman', 'W. Chicago',
-  'W. Montrose', 'Warren'
-];
+const PROPERTIES = getPropertyNicknames();
 
 const UNIT_TYPES = ['Studio', '1BR', '2BR', '3BR', '4BR'];
 const FLOORS = ['Ground', 'Middle', 'Top'];

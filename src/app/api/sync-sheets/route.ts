@@ -30,19 +30,20 @@ function parseGoogleDate(dateStr: string | null): string | null {
 }
 
 function mapPropertyName(name: string): string {
+  // Maps Google Sheet property codes to standard nicknames (must match properties.ts)
   const mapping: Record<string, string> = {
     'Broadway': 'Broadway',
     'Countryside_T': 'Countryside T',
     'Countryside_C': 'Countryside C',
     'Fullerton': 'Fullerton',
-    'Green_Bay_246': '246 Green Bay',
-    'Green_Bay_440': '440 Green Bay',
-    'Green_Bay_546': '546 Green Bay',
+    'Green_Bay_246': 'Green Bay 246',
+    'Green_Bay_440': 'Green Bay 440',
+    'Green_Bay_546': 'Green Bay 546',
     'Greenleaf': 'Greenleaf',
     'Kedzie': 'Kedzie',
     'Kennedy': 'Kennedy',
     'Liberty': 'Liberty',
-    'N_Clark': 'N. Clark',
+    'N_Clark': 'North Clark',
     'Park': 'Park',
     'Rogers': 'Rogers',
     'Sheffield': 'Sheffield',
