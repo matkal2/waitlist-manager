@@ -42,6 +42,12 @@ interface ParkingSpot {
   has_ev_charging: boolean;
   is_handicap: boolean;
   space_size: string | null;
+  // Future tenant info
+  future_tenant_code: string | null;
+  future_tenant_name: string | null;
+  future_unit_number: string | null;
+  future_start_date: string | null;
+  has_future_tenant: boolean;
 }
 
 interface ParkingChange {
@@ -691,6 +697,29 @@ export default function ParkingPage() {
                                         )}
                                       </div>
                                       <span className="text-muted-foreground text-xs">{spot.tenant_code}</span>
+                                      {/* Show future tenant indicator if there's one */}
+                                      {spot.has_future_tenant && spot.future_tenant_name && (
+                                        <div className="mt-1 p-1 bg-blue-50 border border-blue-200 rounded text-[10px]">
+                                          <div className="flex items-center gap-1 text-blue-700">
+                                            <Calendar className="h-3 w-3" />
+                                            <span className="font-medium">Future: {spot.future_tenant_name}</span>
+                                          </div>
+                                          <div className="text-blue-600">
+                                            Unit {spot.future_unit_number} • Starts {spot.future_start_date ? new Date(spot.future_start_date + 'T00:00:00').toLocaleDateString() : 'TBD'}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : spot.has_future_tenant ? (
+                                    <div className="p-1 bg-blue-50 border border-blue-200 rounded text-[10px]">
+                                      <div className="flex items-center gap-1 text-blue-700">
+                                        <Calendar className="h-3 w-3" />
+                                        <span className="font-medium">Future: {spot.future_tenant_name || 'Assigned'}</span>
+                                      </div>
+                                      <div className="text-blue-600">
+                                        {spot.future_unit_number && <>Unit {spot.future_unit_number} • </>}
+                                        Starts {spot.future_start_date ? new Date(spot.future_start_date + 'T00:00:00').toLocaleDateString() : 'TBD'}
+                                      </div>
                                     </div>
                                   ) : (
                                     <span className="text-muted-foreground">—</span>

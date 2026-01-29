@@ -19,6 +19,12 @@ interface ParkingSpot {
   has_ev_charging: boolean;
   is_handicap: boolean;
   space_size: string | null;
+  // Future tenant info (when a spot is pre-assigned)
+  future_tenant_code: string | null;
+  future_tenant_name: string | null;
+  future_unit_number: string | null;
+  future_start_date: string | null;
+  has_future_tenant: boolean;
 }
 
 interface DirectoryEntry {
@@ -48,17 +54,27 @@ function normalizeStatus(status: string): ParkingSpot['status'] {
   return 'Occupied';
 }
 
-// Determine actual status based on termination date and tenant
+// Determine actual status based on termination date, tenant, and lease start date
 function determineStatus(
   rawStatus: ParkingSpot['status'],
   terminationDate: string | null,
-  tenantCode: string | null
+  tenantCode: string | null,
+  leaseStartDate: string | null
 ): ParkingSpot['status'] {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
   // If it's a reserved spot (handicap), keep it
   if (rawStatus === 'Reserved') return 'Reserved';
+  
+  // If lease start date is in the future, the spot is currently vacant (with future assignment)
+  if (leaseStartDate && tenantCode) {
+    const startDate = new Date(leaseStartDate);
+    startDate.setHours(0, 0, 0, 0);
+    if (startDate > today) {
+      return 'Vacant'; // Currently vacant, but has future tenant
+    }
+  }
   
   // If there's a termination date
   if (terminationDate) {
@@ -176,13 +192,56 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
     const tenantCode = cells[20]?.v || null; // Column U
     const leaseStartDateRaw = cells[22]?.v || null; // Column W
     const terminationDateRaw = cells[23]?.v || null; // Column X
+    // Future tenant columns (columns Y=24, Z=25, AA=26)
+    const futureTenantCodeRaw = cells[24]?.v || null; // Column Y - Future tenant code
+    const futureStartDateRaw = cells[25]?.v || null; // Column Z - Future start date
     
     const rawStatus = normalizeStatus(statusRaw);
     const terminationDate = parseGoogleDate(terminationDateRaw);
     const availableDate = parseGoogleDate(availableDateRaw);
+    const leaseStartDate = parseGoogleDate(leaseStartDateRaw);
+    const futureStartDate = parseGoogleDate(futureStartDateRaw);
     
-    // Determine actual status based on termination date
-    const status = determineStatus(rawStatus, terminationDate, tenantCode);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Check if the current tenant's lease starts in the future
+    const currentLeaseIsFuture = leaseStartDate && tenantCode && new Date(leaseStartDate) > today;
+    
+    // Determine future tenant info
+    let futureTenantCode: string | null = null;
+    let futureTenantName: string | null = null;
+    let futureUnitNumber: string | null = null;
+    let effectiveFutureStartDate: string | null = null;
+    let hasFutureTenant = false;
+    
+    // If there's an explicit future tenant column
+    if (futureTenantCodeRaw) {
+      futureTenantCode = futureTenantCodeRaw;
+      const futureEntry = directoryMap.get(futureTenantCodeRaw);
+      futureTenantName = futureEntry?.residentName || null;
+      futureUnitNumber = futureEntry?.unitNumber || null;
+      effectiveFutureStartDate = futureStartDate;
+      hasFutureTenant = true;
+    }
+    // If current tenant's lease starts in the future, treat them as future tenant
+    else if (currentLeaseIsFuture) {
+      futureTenantCode = tenantCode;
+      const futureEntry = tenantCode ? directoryMap.get(tenantCode) : null;
+      futureTenantName = futureEntry?.residentName || null;
+      futureUnitNumber = futureEntry?.unitNumber || null;
+      effectiveFutureStartDate = leaseStartDate;
+      hasFutureTenant = true;
+    }
+    
+    // Determine actual status
+    const status = determineStatus(rawStatus, terminationDate, currentLeaseIsFuture ? null : tenantCode, leaseStartDate);
+    
+    // For current tenant display, don't show if their lease hasn't started yet
+    const effectiveTenantCode = currentLeaseIsFuture ? null : tenantCode;
+    const directoryEntry = effectiveTenantCode ? directoryMap.get(effectiveTenantCode) : null;
+    const tenantName = directoryEntry?.residentName || null;
+    const unitNumber = directoryEntry?.unitNumber || null;
     
     // For Notice spots, available date is the day after termination
     // For Vacant spots, use the available date from sheet or today
@@ -195,11 +254,6 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
       effectiveAvailableDate = availableDate || new Date().toISOString().split('T')[0];
     }
     
-    // Look up tenant info from directory
-    const directoryEntry = tenantCode ? directoryMap.get(tenantCode) : null;
-    const tenantName = directoryEntry?.residentName || null;
-    const unitNumber = directoryEntry?.unitNumber || null;
-    
     spots.push({
       id: fullSpaceCode,
       property,
@@ -208,15 +262,20 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
       full_space_code: fullSpaceCode,
       monthly_rent: monthlyRent,
       status,
-      tenant_code: tenantCode,
+      tenant_code: effectiveTenantCode,
       tenant_name: tenantName,
       unit_number: unitNumber,
-      lease_start_date: parseGoogleDate(leaseStartDateRaw),
+      lease_start_date: currentLeaseIsFuture ? null : leaseStartDate,
       termination_date: terminationDate,
       available_date: effectiveAvailableDate,
       has_ev_charging: hasEvCharging,
       is_handicap: isHandicap,
       space_size: spaceSize,
+      future_tenant_code: futureTenantCode,
+      future_tenant_name: futureTenantName,
+      future_unit_number: futureUnitNumber,
+      future_start_date: effectiveFutureStartDate,
+      has_future_tenant: hasFutureTenant,
     });
   }
   
