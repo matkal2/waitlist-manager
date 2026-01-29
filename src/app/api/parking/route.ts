@@ -192,15 +192,11 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
     const tenantCode = cells[20]?.v || null; // Column U
     const leaseStartDateRaw = cells[22]?.v || null; // Column W
     const terminationDateRaw = cells[23]?.v || null; // Column X
-    // Future tenant columns (columns Y=24, Z=25, AA=26)
-    const futureTenantCodeRaw = cells[24]?.v || null; // Column Y - Future tenant code
-    const futureStartDateRaw = cells[25]?.v || null; // Column Z - Future start date
     
     const rawStatus = normalizeStatus(statusRaw);
     const terminationDate = parseGoogleDate(terminationDateRaw);
     const availableDate = parseGoogleDate(availableDateRaw);
     const leaseStartDate = parseGoogleDate(leaseStartDateRaw);
-    const futureStartDate = parseGoogleDate(futureStartDateRaw);
     
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -208,24 +204,15 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
     // Check if the current tenant's lease starts in the future
     const currentLeaseIsFuture = leaseStartDate && tenantCode && new Date(leaseStartDate) > today;
     
-    // Determine future tenant info
+    // Determine future tenant info - only when lease starts in the future
     let futureTenantCode: string | null = null;
     let futureTenantName: string | null = null;
     let futureUnitNumber: string | null = null;
     let effectiveFutureStartDate: string | null = null;
     let hasFutureTenant = false;
     
-    // If there's an explicit future tenant column
-    if (futureTenantCodeRaw) {
-      futureTenantCode = futureTenantCodeRaw;
-      const futureEntry = directoryMap.get(futureTenantCodeRaw);
-      futureTenantName = futureEntry?.residentName || null;
-      futureUnitNumber = futureEntry?.unitNumber || null;
-      effectiveFutureStartDate = futureStartDate;
-      hasFutureTenant = true;
-    }
     // If current tenant's lease starts in the future, treat them as future tenant
-    else if (currentLeaseIsFuture) {
+    if (currentLeaseIsFuture) {
       futureTenantCode = tenantCode;
       const futureEntry = tenantCode ? directoryMap.get(tenantCode) : null;
       futureTenantName = futureEntry?.residentName || null;

@@ -650,12 +650,13 @@ export default function ParkingPage() {
                             <TableHead className="w-[80px]">Features</TableHead>
                             <TableHead className="w-[110px]">Lease Start</TableHead>
                             <TableHead className="w-[110px]">Termination</TableHead>
+                            <TableHead className="w-[100px]">Future</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {filteredSpots.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                              <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                                 No spots match your filters
                               </TableCell>
                             </TableRow>
@@ -697,29 +698,6 @@ export default function ParkingPage() {
                                         )}
                                       </div>
                                       <span className="text-muted-foreground text-xs">{spot.tenant_code}</span>
-                                      {/* Show future tenant indicator if there's one */}
-                                      {spot.has_future_tenant && spot.future_tenant_name && (
-                                        <div className="mt-1 p-1 bg-blue-50 border border-blue-200 rounded text-[10px]">
-                                          <div className="flex items-center gap-1 text-blue-700">
-                                            <Calendar className="h-3 w-3" />
-                                            <span className="font-medium">Future: {spot.future_tenant_name}</span>
-                                          </div>
-                                          <div className="text-blue-600">
-                                            Unit {spot.future_unit_number} • Starts {spot.future_start_date ? new Date(spot.future_start_date + 'T00:00:00').toLocaleDateString() : 'TBD'}
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ) : spot.has_future_tenant ? (
-                                    <div className="p-1 bg-blue-50 border border-blue-200 rounded text-[10px]">
-                                      <div className="flex items-center gap-1 text-blue-700">
-                                        <Calendar className="h-3 w-3" />
-                                        <span className="font-medium">Future: {spot.future_tenant_name || 'Assigned'}</span>
-                                      </div>
-                                      <div className="text-blue-600">
-                                        {spot.future_unit_number && <>Unit {spot.future_unit_number} • </>}
-                                        Starts {spot.future_start_date ? new Date(spot.future_start_date + 'T00:00:00').toLocaleDateString() : 'TBD'}
-                                      </div>
                                     </div>
                                   ) : (
                                     <span className="text-muted-foreground">—</span>
@@ -754,6 +732,27 @@ export default function ParkingPage() {
                                           Available {new Date(spot.available_date + 'T00:00:00').toLocaleDateString()}
                                         </div>
                                       )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  {spot.has_future_tenant ? (
+                                    <div 
+                                      className="relative group cursor-pointer"
+                                      title={`${spot.future_tenant_name || 'Assigned'}\nUnit: ${spot.future_unit_number || 'N/A'}\nStarts: ${spot.future_start_date ? new Date(spot.future_start_date + 'T00:00:00').toLocaleDateString() : 'TBD'}`}
+                                    >
+                                      <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-700 border-blue-300 cursor-pointer">
+                                        📅 Future
+                                      </Badge>
+                                      <div className="absolute z-50 bottom-full left-0 mb-2 hidden group-hover:block w-48 p-2 bg-white border border-blue-200 rounded-lg shadow-lg text-xs">
+                                        <div className="font-semibold text-blue-800">{spot.future_tenant_name || 'Tenant Assigned'}</div>
+                                        {spot.future_unit_number && <div className="text-gray-600">Unit: {spot.future_unit_number}</div>}
+                                        <div className="text-blue-600">
+                                          Starts: {spot.future_start_date ? new Date(spot.future_start_date + 'T00:00:00').toLocaleDateString() : 'TBD'}
+                                        </div>
+                                      </div>
                                     </div>
                                   ) : (
                                     <span className="text-muted-foreground">—</span>
