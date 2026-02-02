@@ -1374,17 +1374,55 @@ export default function ParkingPage() {
                                         )}
                                       </div>
                                     </div>
-                                    <div className="text-right">
+                                    <div className="text-right flex items-center gap-2">
                                       {matches.length > 0 ? (
-                                        <div className="space-y-1">
-                                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
-                                            {matches.length} waitlist match{matches.length !== 1 ? 'es' : ''}
-                                          </Badge>
-                                          <div className="text-xs text-muted-foreground max-w-[200px]">
-                                            {matches.slice(0, 2).map(m => m.tenant_name).join(', ')}
-                                            {matches.length > 2 && ` +${matches.length - 2} more`}
-                                          </div>
-                                        </div>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="outline" size="sm" className="h-7 bg-green-50 text-green-700 border-green-300 hover:bg-green-100">
+                                              <Users className="h-3 w-3 mr-1" />
+                                              {matches.length} match{matches.length !== 1 ? 'es' : ''}
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end" className="w-64">
+                                            <DropdownMenuLabel className="text-xs text-muted-foreground">
+                                              Assign to {spot.full_space_code} (available {availDate.toLocaleDateString()})
+                                            </DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            {matches.map(match => (
+                                              <DropdownMenuItem 
+                                                key={match.id}
+                                                className="flex flex-col items-start py-2 cursor-pointer"
+                                                onClick={() => {
+                                                  const confirmed = confirm(
+                                                    `Assign ${match.tenant_name} to ${spot.full_space_code}?\n\n` +
+                                                    `This will open the Change Form pre-filled with:\n` +
+                                                    `• Tenant: ${match.tenant_name}\n` +
+                                                    `• Unit: ${match.unit_number || 'N/A'}\n` +
+                                                    `• Space: ${spot.full_space_code}\n` +
+                                                    `• Effective Date: ${availDate.toLocaleDateString()}`
+                                                  );
+                                                  if (confirmed) {
+                                                    alert(
+                                                      `To complete this assignment:\n\n` +
+                                                      `1. Click "Parking Change" button in header\n` +
+                                                      `2. Select "Add" as change type\n` +
+                                                      `3. Enter: ${match.tenant_name}\n` +
+                                                      `4. Unit: ${match.unit_number || 'Enter unit'}\n` +
+                                                      `5. Space: ${spot.full_space_code}\n` +
+                                                      `6. Date: ${availDate.toLocaleDateString()}\n\n` +
+                                                      `Then update the waitlist entry status to "Assigned".`
+                                                    );
+                                                  }
+                                                }}
+                                              >
+                                                <span className="font-medium">{match.tenant_name}</span>
+                                                <span className="text-xs text-muted-foreground">
+                                                  {match.unit_number || 'No unit'} • {match.waitlist_type} • Since {new Date(match.created_at).toLocaleDateString()}
+                                                </span>
+                                              </DropdownMenuItem>
+                                            ))}
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
                                       ) : (
                                         <Badge variant="outline" className="text-muted-foreground">
                                           No waitlist match
