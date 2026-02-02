@@ -380,6 +380,34 @@ export default function ParkingPage() {
     }).length,
   };
 
+  // Demand by property - properties with highest waitlist demand
+  const demandByProperty = properties.map(p => {
+    const propWaitlist = waitlist.filter(w => w.property === p && w.status === 'Active');
+    const propSpots = spots.filter(s => s.property === p);
+    const vacantSpots = propSpots.filter(s => s.status === 'Vacant').length;
+    const noticeSpots = propSpots.filter(s => s.status === 'Notice').length;
+    return {
+      property: p,
+      waitlistCount: propWaitlist.length,
+      vacantCount: vacantSpots,
+      noticeCount: noticeSpots,
+      demandScore: propWaitlist.length - vacantSpots, // Higher = more demand than supply
+    };
+  }).sort((a, b) => b.demandScore - a.demandScore);
+
+  // Average wait time calculation (days since created_at for active waitlist entries)
+  const avgWaitTime = (() => {
+    const activeWaitlist = waitlist.filter(w => w.status === 'Active');
+    if (activeWaitlist.length === 0) return 0;
+    const totalDays = activeWaitlist.reduce((sum, w) => {
+      const created = new Date(w.created_at);
+      const now = new Date();
+      const days = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+      return sum + days;
+    }, 0);
+    return Math.round(totalDays / activeWaitlist.length);
+  })();
+
   // Apply filters to spots (property filter is required)
   const filteredSpots = spots.filter(spot => {
     if (!propertyFilter || spot.property !== propertyFilter) return false;
@@ -457,6 +485,103 @@ export default function ParkingPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+        {/* Quick Stats Dashboard */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Car className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <div className="text-xl font-bold">{stats.total}</div>
+                <div className="text-xs text-muted-foreground">Total Spots</div>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              </div>
+              <div>
+                <div className="text-xl font-bold text-green-600">{stats.occupancyRate}%</div>
+                <div className="text-xs text-muted-foreground">Occupancy</div>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                <ParkingCircle className="h-4 w-4 text-blue-600" />
+              </div>
+              <div>
+                <div className="text-xl font-bold text-blue-600">{stats.vacant}</div>
+                <div className="text-xs text-muted-foreground">Vacant</div>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                <AlertTriangle className="h-4 w-4 text-orange-600" />
+              </div>
+              <div>
+                <div className="text-xl font-bold text-orange-600">{stats.notice}</div>
+                <div className="text-xs text-muted-foreground">On Notice</div>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                <Users className="h-4 w-4 text-purple-600" />
+              </div>
+              <div>
+                <div className="text-xl font-bold text-purple-600">{stats.waitlistTotal}</div>
+                <div className="text-xs text-muted-foreground">On Waitlist</div>
+              </div>
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                <TrendingUp className="h-4 w-4 text-amber-600" />
+              </div>
+              <div>
+                <div className="text-xl font-bold text-amber-600">{avgWaitTime}d</div>
+                <div className="text-xs text-muted-foreground">Avg Wait</div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* High Demand Properties Alert */}
+        {demandByProperty.filter(d => d.demandScore > 0).length > 0 && (
+          <Card className="mb-6 border-amber-200 bg-amber-50 dark:bg-amber-900/10">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                <Target className="h-4 w-4" />
+                High Demand Properties
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex flex-wrap gap-2">
+                {demandByProperty.filter(d => d.demandScore > 0).slice(0, 5).map(d => (
+                  <Badge 
+                    key={d.property} 
+                    variant="outline" 
+                    className="bg-white dark:bg-gray-800 cursor-pointer hover:bg-amber-100"
+                    onClick={() => setPropertyFilter(d.property)}
+                  >
+                    <Building2 className="h-3 w-3 mr-1" />
+                    {d.property}: {d.waitlistCount} waiting, {d.vacantCount} vacant
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Tabs defaultValue="inventory" className="space-y-4">
           <TabsList>
             <TabsTrigger value="inventory">
@@ -479,6 +604,15 @@ export default function ParkingPage() {
               <span className="flex items-center gap-2">
                 <History className="h-4 w-4" />
                 Activity Log
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value="upcoming">
+              <span className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Upcoming
+                {stats.notice > 0 && (
+                  <Badge variant="outline" className="ml-1 bg-orange-50 text-orange-600 border-orange-300">{stats.notice}</Badge>
+                )}
               </span>
             </TabsTrigger>
             <TabsTrigger value="tracking">
@@ -1128,6 +1262,156 @@ export default function ParkingPage() {
                     </div>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="upcoming">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Upcoming Availability
+                </CardTitle>
+                <CardDescription>
+                  Timeline of parking spots becoming available based on termination dates
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  // Get all spots on Notice with termination dates, sorted by date
+                  const upcomingSpots = spots
+                    .filter(s => s.status === 'Notice' && s.termination_date)
+                    .sort((a, b) => new Date(a.termination_date!).getTime() - new Date(b.termination_date!).getTime());
+                  
+                  // Group by month
+                  const groupedByMonth: Record<string, ParkingSpot[]> = {};
+                  upcomingSpots.forEach(spot => {
+                    const date = new Date(spot.termination_date! + 'T00:00:00');
+                    const monthKey = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+                    if (!groupedByMonth[monthKey]) groupedByMonth[monthKey] = [];
+                    groupedByMonth[monthKey].push(spot);
+                  });
+
+                  // Get waitlist matches for a spot
+                  const getWaitlistMatches = (spot: ParkingSpot) => {
+                    return waitlist.filter(w => 
+                      w.status === 'Active' && 
+                      w.property === spot.property &&
+                      (w.waitlist_type === '1st Spot' || 
+                       (w.waitlist_type === 'Indoor Upgrade' && spot.spot_type === 'Indoor'))
+                    );
+                  };
+
+                  if (upcomingSpots.length === 0) {
+                    return (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p className="text-lg font-medium">No Upcoming Vacancies</p>
+                        <p className="text-sm">There are no spots currently on notice.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-6">
+                      {/* Summary Stats */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="p-4 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200">
+                          <div className="text-2xl font-bold text-orange-600">{upcomingSpots.length}</div>
+                          <div className="text-sm text-muted-foreground">Total Upcoming</div>
+                        </div>
+                        <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {upcomingSpots.filter(s => s.spot_type === 'Indoor').length}
+                          </div>
+                          <div className="text-sm text-muted-foreground">Indoor</div>
+                        </div>
+                        <div className="p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200">
+                          <div className="text-2xl font-bold text-green-600">
+                            {upcomingSpots.filter(s => s.spot_type === 'Outdoor').length}
+                          </div>
+                          <div className="text-sm text-muted-foreground">Outdoor</div>
+                        </div>
+                        <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200">
+                          <div className="text-2xl font-bold text-purple-600">
+                            {upcomingSpots.filter(s => getWaitlistMatches(s).length > 0).length}
+                          </div>
+                          <div className="text-sm text-muted-foreground">With Waitlist Match</div>
+                        </div>
+                      </div>
+
+                      {/* Timeline by Month */}
+                      {Object.entries(groupedByMonth).map(([month, monthSpots]) => (
+                        <div key={month} className="border rounded-lg overflow-hidden">
+                          <div className="bg-muted/50 px-4 py-2 font-semibold flex items-center justify-between">
+                            <span>{month}</span>
+                            <Badge variant="secondary">{monthSpots.length} spot{monthSpots.length !== 1 ? 's' : ''}</Badge>
+                          </div>
+                          <div className="divide-y">
+                            {monthSpots.map(spot => {
+                              const matches = getWaitlistMatches(spot);
+                              const availDate = new Date(spot.termination_date! + 'T00:00:00');
+                              availDate.setDate(availDate.getDate() + 1);
+                              
+                              return (
+                                <div key={spot.id} className="p-4 hover:bg-muted/30 transition-colors">
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className="font-medium">{spot.full_space_code}</span>
+                                        <Badge variant={spot.spot_type === 'Indoor' ? 'default' : 'outline'} className="text-xs">
+                                          {spot.spot_type}
+                                        </Badge>
+                                        <span className="text-sm text-muted-foreground">${spot.monthly_rent}/mo</span>
+                                      </div>
+                                      <div className="text-sm text-muted-foreground">
+                                        <span className="text-orange-600 font-medium">
+                                          Available: {availDate.toLocaleDateString()}
+                                        </span>
+                                        {spot.tenant_name && (
+                                          <span className="ml-2">• Current: {spot.tenant_name}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      {matches.length > 0 ? (
+                                        <div className="space-y-1">
+                                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                                            {matches.length} waitlist match{matches.length !== 1 ? 'es' : ''}
+                                          </Badge>
+                                          <div className="text-xs text-muted-foreground max-w-[200px]">
+                                            {matches.slice(0, 2).map(m => m.tenant_name).join(', ')}
+                                            {matches.length > 2 && ` +${matches.length - 2} more`}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <Badge variant="outline" className="text-muted-foreground">
+                                          No waitlist match
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {spot.has_future_tenant && spot.future_tenant_name && (
+                                    <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+                                      <span className="text-blue-700 font-medium">Already assigned to: </span>
+                                      <span className="text-blue-600">{spot.future_tenant_name}</span>
+                                      {spot.future_start_date && (
+                                        <span className="text-blue-500 text-xs ml-2">
+                                          (starts {new Date(spot.future_start_date + 'T00:00:00').toLocaleDateString()})
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           </TabsContent>
