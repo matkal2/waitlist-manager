@@ -153,6 +153,13 @@ export default function WaitlistPage() {
   }, [fetchEntries, user]);
 
   const handleSignOut = async () => {
+    // Clear waitlist filters from localStorage on sign out
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('waitlist_agent_filter');
+      localStorage.removeItem('waitlist_property_filter');
+      localStorage.removeItem('waitlist_section8_filter');
+      localStorage.removeItem('waitlist_filters_complete');
+    }
     await signOut();
     router.push('/login');
   };

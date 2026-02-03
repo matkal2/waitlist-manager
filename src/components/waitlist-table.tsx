@@ -610,8 +610,8 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
               </TableHead>
               <TableHead className="w-[110px]">Agent</TableHead>
               <TableHead className="w-[90px]">Contacted</TableHead>
-              <TableHead className="w-[90px]">Status</TableHead>
-              <TableHead className="w-[110px]">Actions</TableHead>
+              <TableHead className="w-[130px]">Status</TableHead>
+              <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -702,20 +702,20 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                      <TableCell onClick={(e) => e.stopPropagation()} className="pr-2">
                         <select
                           value={entry.status}
                           onChange={(e) => handleStatusChange(entry.id, e.target.value)}
-                          className="px-3 py-1 text-sm rounded-md border border-input bg-background cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
+                          className="w-full max-w-[120px] px-2 py-1 text-sm rounded-md border border-input bg-background cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
                         >
                           <option value="Active">Active</option>
-                          <option value="Showing Scheduled">Showing Scheduled</option>
+                          <option value="Showing Scheduled">Showing</option>
                           <option value="Applied">Applied</option>
-                          <option value="Signed Lease">Signed Lease</option>
+                          <option value="Signed Lease">Signed</option>
                         </select>
                       </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-1">
+                      <TableCell onClick={(e) => e.stopPropagation()} className="pl-0">
+                        <div className="flex items-center gap-0">
                           <Button
                             variant="ghost"
                             size="sm"
