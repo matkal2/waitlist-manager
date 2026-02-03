@@ -52,16 +52,39 @@ const PROPERTIES = getPropertyNicknames();
 
 const AGENTS = ['Matthew Kaleb', 'Michael Dillon', 'Unassigned'];
 
-// Normalize property names for filtering (handles legacy "N. Clark" vs "North Clark" etc.)
+// Normalize property names for filtering (handles legacy naming variations)
 const normalizePropertyName = (name: string): string => {
-  const mapping: Record<string, string> = {
-    'N. Clark': 'North Clark',
-    'N Clark': 'North Clark',
-    '246 Green Bay': 'Green Bay 246',
-    '440 Green Bay': 'Green Bay 440',
-    '546 Green Bay': 'Green Bay 546',
-  };
-  return mapping[name] || name;
+  const normalized = name.toLowerCase().trim();
+  
+  // Handle North Clark variations
+  if (normalized === 'n. clark' || normalized === 'n clark' || normalized === 'north clark') {
+    return 'North Clark';
+  }
+  // Handle West Montrose variations
+  if (normalized === 'w. montrose' || normalized === 'w montrose' || normalized === 'west montrose') {
+    return 'W. Montrose';
+  }
+  // Handle West Chicago variations
+  if (normalized === 'w. chicago' || normalized === 'w chicago' || normalized === 'west chicago') {
+    return 'W. Chicago';
+  }
+  // Handle Countryside variations
+  if (normalized.includes('countryside')) {
+    if (normalized.endsWith(' t') || normalized.includes('townhouse') || normalized === 'countryside_t') {
+      return 'Countryside T';
+    }
+    if (normalized.endsWith(' c') || normalized.includes('court') || normalized === 'countryside_c') {
+      return 'Countryside C';
+    }
+  }
+  // Handle Green Bay variations (address numbers can be prefix or suffix)
+  if (normalized.includes('green bay') || normalized.includes('greenbay') || /\d+.*green\s*bay|green\s*bay.*\d+/.test(normalized)) {
+    if (normalized.includes('246')) return 'Green Bay 246';
+    if (normalized.includes('440')) return 'Green Bay 440';
+    if (normalized.includes('546')) return 'Green Bay 546';
+  }
+  
+  return name; // Return original if no normalization needed
 };
 
 // Format date without timezone shift (parses YYYY-MM-DD as local date)
