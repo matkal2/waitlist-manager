@@ -95,20 +95,26 @@ function normalizePropertyName(name: string): string {
   }
   // Handle West Montrose variations
   if (normalized === 'w. montrose' || normalized === 'w montrose' || normalized === 'west montrose') {
-    return 'west montrose';
+    return 'w. montrose';
   }
   // Handle West Chicago variations
   if (normalized === 'w. chicago' || normalized === 'w chicago' || normalized === 'west chicago') {
-    return 'west chicago';
+    return 'w. chicago';
   }
-  // Handle Countryside variations
+  // Handle Countryside variations - check specific suffixes, not just any 't' or 'c'
   if (normalized.includes('countryside')) {
-    if (normalized.includes('t') || normalized.includes('town')) return 'countryside t';
-    if (normalized.includes('c') || normalized.includes('court')) return 'countryside c';
+    // Check for explicit T/Townhouse markers
+    if (normalized.endsWith(' t') || normalized.includes('townhouse') || normalized === 'countryside_t') {
+      return 'countryside t';
+    }
+    // Check for explicit C/Court markers
+    if (normalized.endsWith(' c') || normalized.includes('court') || normalized === 'countryside_c') {
+      return 'countryside c';
+    }
     return normalized;
   }
-  // Handle Green Bay variations
-  if (normalized.includes('green bay') || normalized.includes('greenbay')) {
+  // Handle Green Bay variations (address numbers can be prefix or suffix)
+  if (normalized.includes('green bay') || normalized.includes('greenbay') || /\d+.*green\s*bay|green\s*bay.*\d+/.test(normalized)) {
     if (normalized.includes('246')) return 'green bay 246';
     if (normalized.includes('440')) return 'green bay 440';
     if (normalized.includes('546')) return 'green bay 546';
@@ -480,29 +486,22 @@ export async function GET() {
       }
     }
 
-    // Debug: Find North Clark units and Lauren Cummings entry
-    const northClarkUnits = units.filter(u => u.property.toLowerCase().includes('clark') || u.property.toLowerCase().includes('n.'));
-    const laurenEntry = entries.find(e => e.full_name.toLowerCase().includes('lauren') || e.full_name.toLowerCase().includes('cummings'));
+    // Audit: Check for property name mismatches across all entries and units
+    const unitProperties = [...new Set(units.map(u => u.property))];
+    const entryProperties = [...new Set(entries.map(e => e.property))];
     
-    // Debug: Check why no match
-    const debugInfo: { reason: string; details: string }[] = [];
-    if (laurenEntry && northClarkUnits.length > 0) {
-      for (const unit of northClarkUnits) {
-        const propertyMatch = normalizePropertyName(laurenEntry.property) === normalizePropertyName(unit.property);
-        const entryUnitTypes = laurenEntry.unit_type_pref.split(',').map(t => t.trim());
-        const unitTypeMatch = entryUnitTypes.includes(unit.unit_type);
-        const dateCheck = checkDateMatch(laurenEntry, unit, today);
-        const budgetMatch = laurenEntry.max_budget <= 0 || unit.rent_price <= laurenEntry.max_budget;
-        const matchKey = generateMatchKey(unit.unique_id, laurenEntry.assigned_agent || 'Unassigned');
-        const alreadyNotified = notifiedMatches.has(matchKey);
-        
-        debugInfo.push({
-          reason: `Unit ${unit.unit_number} at ${unit.property}`,
-          details: `Property: ${propertyMatch ? '✓' : '✗'} (entry="${laurenEntry.property}" vs unit="${unit.property}") | ` +
-                   `UnitType: ${unitTypeMatch ? '✓' : '✗'} (wants="${laurenEntry.unit_type_pref}" vs avail="${unit.unit_type}") | ` +
-                   `Date: ${dateCheck.matches ? '✓' : '✗'} | ` +
-                   `Budget: ${budgetMatch ? '✓' : '✗'} ($${laurenEntry.max_budget} vs $${unit.rent_price}) | ` +
-                   `AlreadyNotified: ${alreadyNotified ? 'YES' : 'no'}`
+    // Find entry properties that don't have a direct match but do have a normalized match
+    const propertyMismatches: { entryProperty: string; normalizedTo: string; matchesUnit: string | null }[] = [];
+    for (const entryProp of entryProperties) {
+      const directMatch = unitProperties.find(up => up === entryProp);
+      if (!directMatch) {
+        const normalizedMatch = unitProperties.find(up => 
+          normalizePropertyName(up) === normalizePropertyName(entryProp)
+        );
+        propertyMismatches.push({
+          entryProperty: entryProp,
+          normalizedTo: normalizePropertyName(entryProp),
+          matchesUnit: normalizedMatch || null,
         });
       }
     }
@@ -514,10 +513,11 @@ export async function GET() {
       entriesChecked: entries.length,
       emailsSent: notifications.filter(n => n.success).length,
       notifications,
-      debug: {
-        northClarkUnits: northClarkUnits.map(u => ({ property: u.property, unit: u.unit_number, type: u.unit_type, rent: u.rent_price, available: u.available_date })),
-        laurenEntry: laurenEntry ? { name: laurenEntry.full_name, property: laurenEntry.property, unitType: laurenEntry.unit_type_pref, budget: laurenEntry.max_budget, moveIn: laurenEntry.move_in_date, moveInEnd: laurenEntry.move_in_date_end, agent: laurenEntry.assigned_agent } : null,
-        matchAnalysis: debugInfo,
+      propertyAudit: {
+        unitProperties,
+        entryProperties,
+        mismatches: propertyMismatches,
+        unmatchedEntries: propertyMismatches.filter(m => !m.matchesUnit).map(m => m.entryProperty),
       },
     });
   } catch (error) {
