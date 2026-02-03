@@ -85,6 +85,38 @@ function mapPropertyName(name: string): string {
   return mapping[name] || name.replace(/_/g, ' ');
 }
 
+// Normalize property names for comparison (handles legacy naming like "N. Clark" vs "North Clark")
+function normalizePropertyName(name: string): string {
+  const normalized = name.toLowerCase().trim();
+  
+  // Handle North Clark variations
+  if (normalized === 'n. clark' || normalized === 'n clark' || normalized === 'north clark') {
+    return 'north clark';
+  }
+  // Handle West Montrose variations
+  if (normalized === 'w. montrose' || normalized === 'w montrose' || normalized === 'west montrose') {
+    return 'west montrose';
+  }
+  // Handle West Chicago variations
+  if (normalized === 'w. chicago' || normalized === 'w chicago' || normalized === 'west chicago') {
+    return 'west chicago';
+  }
+  // Handle Countryside variations
+  if (normalized.includes('countryside')) {
+    if (normalized.includes('t') || normalized.includes('town')) return 'countryside t';
+    if (normalized.includes('c') || normalized.includes('court')) return 'countryside c';
+    return normalized;
+  }
+  // Handle Green Bay variations
+  if (normalized.includes('green bay') || normalized.includes('greenbay')) {
+    if (normalized.includes('246')) return 'green bay 246';
+    if (normalized.includes('440')) return 'green bay 440';
+    if (normalized.includes('546')) return 'green bay 546';
+  }
+  
+  return normalized;
+}
+
 function bedroomsToUnitType(bedrooms: number): string {
   if (bedrooms === 0) return 'Studio';
   return `${bedrooms}BR`;
@@ -357,7 +389,8 @@ export async function GET() {
       const matchingEntries: MatchedEntry[] = entries
         .filter(entry => {
           // ===== MANDATORY MATCHES =====
-          if (entry.property !== unit.property) return false;
+          // Use normalized property names for comparison (handles "N. Clark" vs "North Clark" etc.)
+          if (normalizePropertyName(entry.property) !== normalizePropertyName(unit.property)) return false;
           const entryUnitTypes = entry.unit_type_pref.split(',').map(t => t.trim());
           if (!entryUnitTypes.includes(unit.unit_type)) return false;
           const dateCheck = checkDateMatch(entry, unit, today);
@@ -447,6 +480,33 @@ export async function GET() {
       }
     }
 
+    // Debug: Find North Clark units and Lauren Cummings entry
+    const northClarkUnits = units.filter(u => u.property.toLowerCase().includes('clark') || u.property.toLowerCase().includes('n.'));
+    const laurenEntry = entries.find(e => e.full_name.toLowerCase().includes('lauren') || e.full_name.toLowerCase().includes('cummings'));
+    
+    // Debug: Check why no match
+    const debugInfo: { reason: string; details: string }[] = [];
+    if (laurenEntry && northClarkUnits.length > 0) {
+      for (const unit of northClarkUnits) {
+        const propertyMatch = normalizePropertyName(laurenEntry.property) === normalizePropertyName(unit.property);
+        const entryUnitTypes = laurenEntry.unit_type_pref.split(',').map(t => t.trim());
+        const unitTypeMatch = entryUnitTypes.includes(unit.unit_type);
+        const dateCheck = checkDateMatch(laurenEntry, unit, today);
+        const budgetMatch = laurenEntry.max_budget <= 0 || unit.rent_price <= laurenEntry.max_budget;
+        const matchKey = generateMatchKey(unit.unique_id, laurenEntry.assigned_agent || 'Unassigned');
+        const alreadyNotified = notifiedMatches.has(matchKey);
+        
+        debugInfo.push({
+          reason: `Unit ${unit.unit_number} at ${unit.property}`,
+          details: `Property: ${propertyMatch ? '✓' : '✗'} (entry="${laurenEntry.property}" vs unit="${unit.property}") | ` +
+                   `UnitType: ${unitTypeMatch ? '✓' : '✗'} (wants="${laurenEntry.unit_type_pref}" vs avail="${unit.unit_type}") | ` +
+                   `Date: ${dateCheck.matches ? '✓' : '✗'} | ` +
+                   `Budget: ${budgetMatch ? '✓' : '✗'} ($${laurenEntry.max_budget} vs $${unit.rent_price}) | ` +
+                   `AlreadyNotified: ${alreadyNotified ? 'YES' : 'no'}`
+        });
+      }
+    }
+
     return NextResponse.json({
       success: true,
       checked: new Date().toISOString(),
@@ -454,6 +514,11 @@ export async function GET() {
       entriesChecked: entries.length,
       emailsSent: notifications.filter(n => n.success).length,
       notifications,
+      debug: {
+        northClarkUnits: northClarkUnits.map(u => ({ property: u.property, unit: u.unit_number, type: u.unit_type, rent: u.rent_price, available: u.available_date })),
+        laurenEntry: laurenEntry ? { name: laurenEntry.full_name, property: laurenEntry.property, unitType: laurenEntry.unit_type_pref, budget: laurenEntry.max_budget, moveIn: laurenEntry.move_in_date, moveInEnd: laurenEntry.move_in_date_end, agent: laurenEntry.assigned_agent } : null,
+        matchAnalysis: debugInfo,
+      },
     });
   } catch (error) {
     console.error('Auto-notify error:', error);
