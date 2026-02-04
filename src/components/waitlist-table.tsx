@@ -104,41 +104,9 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [editingEntry, setEditingEntry] = useState<WaitlistEntry | null>(null);
   const [editForm, setEditForm] = useState<Partial<WaitlistEntry>>({});
-  // Check localStorage for saved filter state on initial load
-  const [filtersComplete, setFiltersComplete] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('waitlist_filters_complete') === 'true';
-    }
-    return false;
-  });
+  // Filters reset on every page load/refresh (no localStorage persistence)
+  const [filtersComplete, setFiltersComplete] = useState(false);
   const [filterStep, setFilterStep] = useState(1);
-  const [filtersInitialized, setFiltersInitialized] = useState(false);
-
-  // Load saved filters from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedAgent = localStorage.getItem('waitlist_agent_filter');
-      const savedProperty = localStorage.getItem('waitlist_property_filter');
-      const savedSection8 = localStorage.getItem('waitlist_section8_filter');
-      const savedComplete = localStorage.getItem('waitlist_filters_complete') === 'true';
-      
-      if (savedAgent) setAgentFilter(savedAgent);
-      if (savedProperty) setPropertyFilter(savedProperty);
-      if (savedSection8) setSection8Filter(savedSection8);
-      if (savedComplete) setFiltersComplete(true);
-      setFiltersInitialized(true);
-    }
-  }, []);
-
-  // Save filters to localStorage whenever they change
-  useEffect(() => {
-    if (filtersInitialized && typeof window !== 'undefined') {
-      localStorage.setItem('waitlist_agent_filter', agentFilter);
-      localStorage.setItem('waitlist_property_filter', propertyFilter);
-      localStorage.setItem('waitlist_section8_filter', section8Filter);
-      localStorage.setItem('waitlist_filters_complete', filtersComplete.toString());
-    }
-  }, [agentFilter, propertyFilter, section8Filter, filtersComplete, filtersInitialized]);
 
   // Get current user's agent name from email
   const currentAgent = currentUserEmail ? EMAIL_TO_AGENT[currentUserEmail] : null;
