@@ -5,7 +5,7 @@ import { WaitlistEntry } from '@/types/database';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bell, Mail, Phone, User, Home, DollarSign, Calendar } from 'lucide-react';
+import { Bell, Mail, Phone, User, Home, DollarSign, Calendar, X } from 'lucide-react';
 
 interface SheetUnit {
   property: string;
@@ -38,6 +38,33 @@ interface Match {
 
 export function SheetsMatchAlerts({ units, waitlistEntries }: SheetsMatchAlertsProps) {
   const [sendingNotifications, setSendingNotifications] = useState<string[]>([]);
+  
+  // Track dismissed/archived alerts (persists during session)
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('dismissed_match_alerts');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    }
+    return new Set();
+  });
+
+  // Save dismissed alerts to sessionStorage
+  const dismissAlert = (unitId: string, entryId: string) => {
+    const key = `${unitId}:${entryId}`;
+    setDismissedAlerts(prev => {
+      const updated = new Set(prev);
+      updated.add(key);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('dismissed_match_alerts', JSON.stringify([...updated]));
+      }
+      return updated;
+    });
+  };
+
+  // Check if an alert is dismissed
+  const isAlertDismissed = (unitId: string, entryId: string) => {
+    return dismissedAlerts.has(`${unitId}:${entryId}`);
+  };
 
   const findMatches = (): Match[] => {
     const activeEntries = waitlistEntries.filter(e => e.status === 'Active');
@@ -140,15 +167,22 @@ export function SheetsMatchAlerts({ units, waitlistEntries }: SheetsMatchAlertsP
         });
 
       if (matchingEntries.length > 0) {
-        // Sort: Internal Transfers first, then by created_at
-        const sortedEntries = matchingEntries.sort((a, b) => {
-          if (a.entry_type !== b.entry_type) {
-            return a.entry_type === 'Internal Transfer' ? -1 : 1;
-          }
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        });
+        // Filter out dismissed alerts
+        const nonDismissedEntries = matchingEntries.filter(
+          entry => !isAlertDismissed(unit.unique_id, entry.id)
+        );
         
-        matches.push({ unit, entries: sortedEntries });
+        if (nonDismissedEntries.length > 0) {
+          // Sort: Internal Transfers first, then by created_at
+          const sortedEntries = nonDismissedEntries.sort((a, b) => {
+            if (a.entry_type !== b.entry_type) {
+              return a.entry_type === 'Internal Transfer' ? -1 : 1;
+            }
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          });
+          
+          matches.push({ unit, entries: sortedEntries });
+        }
       }
     }
 
@@ -309,6 +343,15 @@ export function SheetsMatchAlerts({ units, waitlistEntries }: SheetsMatchAlertsP
                         </div>
                       </div>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                      onClick={() => dismissAlert(unit.unique_id, entry.id)}
+                      title="Dismiss this alert"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 ))}
               </div>
