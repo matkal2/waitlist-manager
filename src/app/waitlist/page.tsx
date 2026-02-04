@@ -153,6 +153,14 @@ export default function WaitlistPage() {
   }, [fetchEntries, user]);
 
   const handleSignOut = async () => {
+    // Clear session filters on logout
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('wl_agent');
+      sessionStorage.removeItem('wl_status');
+      sessionStorage.removeItem('wl_property');
+      sessionStorage.removeItem('wl_section8');
+      sessionStorage.removeItem('wl_complete');
+    }
     await signOut();
     router.push('/login');
   };

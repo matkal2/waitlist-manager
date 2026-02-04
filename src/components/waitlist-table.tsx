@@ -94,19 +94,40 @@ const formatDateLocal = (dateString: string) => {
 };
 
 export function WaitlistTable({ entries, onRefresh, currentUserEmail }: WaitlistTableProps) {
+  // Check if this is a page refresh - if so, clear session filters
+  const isPageRefresh = typeof window !== 'undefined' && 
+    performance.getEntriesByType('navigation').length > 0 &&
+    (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.type === 'reload';
+  
+  // Initialize filters from sessionStorage (persists during app use, but not on refresh/browser close)
+  const getSessionFilter = (key: string, defaultValue: string) => {
+    if (typeof window === 'undefined' || isPageRefresh) return defaultValue;
+    return sessionStorage.getItem(key) || defaultValue;
+  };
+
   const [searchTerm, setSearchTerm] = useState('');
-  const [agentFilter, setAgentFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [propertyFilter, setPropertyFilter] = useState<string>('');
-  const [section8Filter, setSection8Filter] = useState<string>('');
+  const [agentFilter, setAgentFilter] = useState<string>(() => getSessionFilter('wl_agent', ''));
+  const [statusFilter, setStatusFilter] = useState<string>(() => getSessionFilter('wl_status', 'all'));
+  const [propertyFilter, setPropertyFilter] = useState<string>(() => getSessionFilter('wl_property', ''));
+  const [section8Filter, setSection8Filter] = useState<string>(() => getSessionFilter('wl_section8', ''));
   const [sortField, setSortField] = useState<SortField>('created_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [editingEntry, setEditingEntry] = useState<WaitlistEntry | null>(null);
   const [editForm, setEditForm] = useState<Partial<WaitlistEntry>>({});
-  // Filters reset on every page load/refresh (no localStorage persistence)
-  const [filtersComplete, setFiltersComplete] = useState(false);
+  const [filtersComplete, setFiltersComplete] = useState(() => getSessionFilter('wl_complete', 'false') === 'true');
   const [filterStep, setFilterStep] = useState(1);
+
+  // Save filters to sessionStorage when they change (persists during session, clears on browser close)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('wl_agent', agentFilter);
+      sessionStorage.setItem('wl_status', statusFilter);
+      sessionStorage.setItem('wl_property', propertyFilter);
+      sessionStorage.setItem('wl_section8', section8Filter);
+      sessionStorage.setItem('wl_complete', filtersComplete.toString());
+    }
+  }, [agentFilter, statusFilter, propertyFilter, section8Filter, filtersComplete]);
 
   // Get current user's agent name from email
   const currentAgent = currentUserEmail ? EMAIL_TO_AGENT[currentUserEmail] : null;
