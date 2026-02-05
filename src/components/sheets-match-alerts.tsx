@@ -39,23 +39,23 @@ interface Match {
 export function SheetsMatchAlerts({ units, waitlistEntries }: SheetsMatchAlertsProps) {
   const [sendingNotifications, setSendingNotifications] = useState<string[]>([]);
   
-  // Track dismissed/archived alerts (persists during session)
+  // Track dismissed/archived alerts (persists permanently in localStorage)
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(() => {
     if (typeof window !== 'undefined') {
-      const saved = sessionStorage.getItem('dismissed_match_alerts');
+      const saved = localStorage.getItem('dismissed_match_alerts');
       return saved ? new Set(JSON.parse(saved)) : new Set();
     }
     return new Set();
   });
 
-  // Save dismissed alerts to sessionStorage
+  // Save dismissed alerts to localStorage (permanent)
   const dismissAlert = (unitId: string, entryId: string) => {
     const key = `${unitId}:${entryId}`;
     setDismissedAlerts(prev => {
       const updated = new Set(prev);
       updated.add(key);
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem('dismissed_match_alerts', JSON.stringify([...updated]));
+        localStorage.setItem('dismissed_match_alerts', JSON.stringify([...updated]));
       }
       return updated;
     });
