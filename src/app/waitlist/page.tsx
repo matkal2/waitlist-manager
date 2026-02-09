@@ -54,26 +54,23 @@ export default function WaitlistPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userFullName, setUserFullName] = useState<string | null>(null);
-  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
-
-  // Load dismissed alerts from localStorage on mount
-  useEffect(() => {
+  // Load dismissed alerts from localStorage immediately (not in useEffect)
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('dismissed_match_alerts');
-      if (saved) {
-        setDismissedAlerts(new Set(JSON.parse(saved)));
-      }
+      return saved ? new Set(JSON.parse(saved)) : new Set();
     }
-    
-    // Listen for storage changes (when alerts are dismissed in child component)
+    return new Set();
+  });
+
+  // Poll for changes since storage event doesn't fire in same tab
+  useEffect(() => {
     const handleStorageChange = () => {
       const saved = localStorage.getItem('dismissed_match_alerts');
       setDismissedAlerts(saved ? new Set(JSON.parse(saved)) : new Set());
     };
     
     window.addEventListener('storage', handleStorageChange);
-    
-    // Also poll for changes since storage event doesn't fire in same tab
     const interval = setInterval(handleStorageChange, 500);
     
     return () => {
