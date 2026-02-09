@@ -185,11 +185,25 @@ export default function WaitlistPage() {
     availableUnits: sheetUnits.length,
   };
 
+  // Get dismissed alerts from localStorage to exclude from count
+  const getDismissedAlerts = (): Set<string> => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dismissed_match_alerts');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    }
+    return new Set();
+  };
+
   const matchCount = sheetUnits.reduce((count: number, unit: SheetUnit) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const dismissedAlerts = getDismissedAlerts();
     
     const matches = entries.filter(e => {
+      // Check if this specific unit+entry combo is dismissed
+      const alertKey = `${unit.unique_id}:${e.id}`;
+      if (dismissedAlerts.has(alertKey)) return false;
+      
       if (e.status !== 'Active') return false;
       if (e.property !== unit.property) return false;
       if (e.unit_type_pref !== unit.unit_type) return false;
