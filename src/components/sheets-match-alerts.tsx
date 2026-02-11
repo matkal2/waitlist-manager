@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { WaitlistEntry } from '@/types/database';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ interface SheetUnit {
 interface SheetsMatchAlertsProps {
   units: SheetUnit[];
   waitlistEntries: WaitlistEntry[];
+  onMatchCountChange?: (count: number) => void;
 }
 
 interface MatchedEntry extends WaitlistEntry {
@@ -36,7 +37,7 @@ interface Match {
   entries: MatchedEntry[];
 }
 
-export function SheetsMatchAlerts({ units, waitlistEntries }: SheetsMatchAlertsProps) {
+export function SheetsMatchAlerts({ units, waitlistEntries, onMatchCountChange }: SheetsMatchAlertsProps) {
   const [sendingNotifications, setSendingNotifications] = useState<string[]>([]);
   
   // Track dismissed/archived alerts (persists permanently in localStorage)
@@ -253,6 +254,13 @@ export function SheetsMatchAlerts({ units, waitlistEntries }: SheetsMatchAlertsP
 
   const matches = findMatches();
   const totalMatches = matches.reduce((sum, m) => sum + m.entries.length, 0);
+
+  // Report match count back to parent for badge display
+  useEffect(() => {
+    if (onMatchCountChange) {
+      onMatchCountChange(matches.length);
+    }
+  }, [matches.length, onMatchCountChange]);
 
   if (matches.length === 0) {
     return (

@@ -54,30 +54,7 @@ export default function WaitlistPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userFullName, setUserFullName] = useState<string | null>(null);
-  // Load dismissed alerts from localStorage immediately (not in useEffect)
-  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('dismissed_match_alerts');
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    }
-    return new Set();
-  });
-
-  // Poll for changes since storage event doesn't fire in same tab
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const saved = localStorage.getItem('dismissed_match_alerts');
-      setDismissedAlerts(saved ? new Set(JSON.parse(saved)) : new Set());
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    const interval = setInterval(handleStorageChange, 500);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
-  }, []);
+  const [matchCount, setMatchCount] = useState(0);
 
   const fetchEntries = useCallback(async () => {
     try {
@@ -209,53 +186,7 @@ export default function WaitlistPage() {
     availableUnits: sheetUnits.length,
   };
 
-  const matchCount = sheetUnits.reduce((count: number, unit: SheetUnit) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const matches = entries.filter(e => {
-      // Check if this specific unit+entry combo is dismissed
-      const alertKey = `${unit.unique_id}:${e.id}`;
-      if (dismissedAlerts.has(alertKey)) return false;
-      
-      if (e.status !== 'Active') return false;
-      if (e.property !== unit.property) return false;
-      // Match unit type - supports multiple unit types (comma-separated)
-      const entryUnitTypes = e.unit_type_pref.split(',').map(t => t.trim());
-      if (!entryUnitTypes.includes(unit.unit_type)) return false;
-      
-      const entryMoveInStart = new Date(e.move_in_date);
-      entryMoveInStart.setHours(0, 0, 0, 0);
-      const entryMoveInEnd = e.move_in_date_end 
-        ? new Date(e.move_in_date_end) 
-        : entryMoveInStart;
-      entryMoveInEnd.setHours(0, 0, 0, 0);
-      
-      const isAvailableNow = !unit.available_date || 
-        unit.available_date.toLowerCase() === 'now' || 
-        unit.available_date.toLowerCase() === 'available';
-      
-      if (isAvailableNow) {
-        const thirtyDaysFromNow = new Date(today);
-        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-        if (entryMoveInStart > thirtyDaysFromNow) return false;
-        if (entryMoveInEnd < today) return false;
-      } else {
-        const unitAvailable = new Date(unit.available_date!);
-        unitAvailable.setHours(0, 0, 0, 0);
-        if (e.move_in_date_end) {
-          if (unitAvailable > entryMoveInEnd) return false;
-        } else {
-          if (unitAvailable > entryMoveInStart) return false;
-        }
-      }
-      
-      if (e.max_budget > 0 && unit.rent_price > e.max_budget) return false;
-      
-      return true;
-    });
-    return count + (matches.length > 0 ? 1 : 0);
-  }, 0);
+  // matchCount is now set by SheetsMatchAlerts component via callback
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -435,6 +366,7 @@ export default function WaitlistPage() {
                 <SheetsMatchAlerts 
                   units={sheetUnits} 
                   waitlistEntries={entries}
+                  onMatchCountChange={setMatchCount}
                 />
               </CardContent>
             </Card>
