@@ -555,33 +555,6 @@ export default function ParkingPage() {
           </Card>
         </div>
 
-        {/* High Demand Properties Alert */}
-        {demandByProperty.filter(d => d.demandScore > 0).length > 0 && (
-          <Card className="mb-6 border-amber-200 bg-amber-50 dark:bg-amber-900/10">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2 text-amber-800 dark:text-amber-200">
-                <Target className="h-4 w-4" />
-                High Demand Properties
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="flex flex-wrap gap-2">
-                {demandByProperty.filter(d => d.demandScore > 0).slice(0, 5).map(d => (
-                  <Badge 
-                    key={d.property} 
-                    variant="outline" 
-                    className="bg-white dark:bg-gray-800 cursor-pointer hover:bg-amber-100"
-                    onClick={() => setPropertyFilter(d.property)}
-                  >
-                    <Building2 className="h-3 w-3 mr-1" />
-                    {d.property}: {d.waitlistCount} waiting, {d.vacantCount} vacant
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         <Tabs defaultValue="inventory" className="space-y-4">
           <TabsList>
             <TabsTrigger value="inventory">
