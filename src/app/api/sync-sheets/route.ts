@@ -26,7 +26,23 @@ function parseGoogleDate(dateStr: string | null): string | null {
     const day = parseInt(match[3]);
     return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
   }
+  // Handle other date formats (e.g., "2/15/2026" or "02/15/2026")
+  const slashMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (slashMatch) {
+    const month = parseInt(slashMatch[1]);
+    const day = parseInt(slashMatch[2]);
+    const year = parseInt(slashMatch[3]);
+    return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+  }
   return null;
+}
+
+function parseRentPrice(rentStr: string | number | null): number {
+  if (rentStr === null || rentStr === undefined) return 0;
+  if (typeof rentStr === 'number') return rentStr;
+  // Remove $, commas, and any other non-numeric characters except decimal point
+  const cleaned = String(rentStr).replace(/[$,]/g, '');
+  return parseFloat(cleaned) || 0;
 }
 
 function mapPropertyName(name: string): string {
@@ -111,8 +127,8 @@ export async function GET() {
       const bedrooms = cells[7]?.v ?? cells[7]?.f ?? null;
       const bathrooms = cells[8]?.v || 0;
       const sqFootage = cells[9]?.v || 0;
-      const availableDateRaw = cells[10]?.v || null;
-      const rentPrice = cells[11]?.v || 0;
+      const availableDateRaw = cells[10]?.v || cells[10]?.f || null;
+      const rentPriceRaw = cells[11]?.v || cells[11]?.f || 0;
       const uniqueId = cells[4]?.v || '';
       
       // Look for unit type in multiple possible columns
@@ -161,7 +177,7 @@ export async function GET() {
         bathrooms,
         sq_footage: sqFootage,
         available_date: parseGoogleDate(availableDateRaw),
-        rent_price: rentPrice,
+        rent_price: parseRentPrice(rentPriceRaw),
         status: 'Available',
         address: addressAndApt.split('\n')[0] || '',
         unique_id: uniqueId,
