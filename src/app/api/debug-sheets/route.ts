@@ -37,12 +37,13 @@ export async function GET() {
       return { rowIndex, cells };
     });
     
-    // Find Greenleaf rows specifically
-    const greenleafRows = data.table.rows
+    // Find Available rows specifically
+    const availableRows = data.table.rows
       .filter((row: any) => {
-        const property = row.c?.[0]?.v || '';
-        return property.toLowerCase().includes('greenleaf');
+        const status = row.c?.[5]?.v || '';
+        return status === 'Available';
       })
+      .slice(0, 5)
       .map((row: any) => {
         const cells: Record<string, any> = {};
         row.c?.forEach((cell: any, cellIndex: number) => {
@@ -58,7 +59,7 @@ export async function GET() {
       success: true,
       columns: cols,
       sampleRows,
-      greenleafRows,
+      availableRows,
       totalRows: data.table.rows.length
     });
   } catch (error) {

@@ -16,25 +16,36 @@ interface SheetUnit {
   unique_id: string;
 }
 
-function parseGoogleDate(dateStr: string | null): string | null {
+function parseGoogleDate(dateStr: string | number | null): string | null {
   if (!dateStr) return null;
+  
+  const str = String(dateStr).trim();
+  
+  // Handle "ASAP", "Now", "Available" as immediate availability
+  if (['asap', 'now', 'available'].includes(str.toLowerCase())) {
+    return 'Now';
+  }
+  
   // Format: "Date(2026,1,1)" -> "2026-02-01" (month is 0-indexed)
-  const match = dateStr.match(/Date\((\d+),(\d+),(\d+)\)/);
+  const match = str.match(/Date\((\d+),(\d+),(\d+)\)/);
   if (match) {
     const year = parseInt(match[1]);
     const month = parseInt(match[2]) + 1; // 0-indexed to 1-indexed
     const day = parseInt(match[3]);
     return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
   }
-  // Handle other date formats (e.g., "2/15/2026" or "02/15/2026")
-  const slashMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  
+  // Handle M/D/YYYY or MM/DD/YYYY format (e.g., "5/5/2026" or "02/15/2026")
+  const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (slashMatch) {
     const month = parseInt(slashMatch[1]);
     const day = parseInt(slashMatch[2]);
     const year = parseInt(slashMatch[3]);
     return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
   }
-  return null;
+  
+  // Return the original string if it looks like a date but doesn't match patterns
+  return str;
 }
 
 function parseRentPrice(rentStr: string | number | null): number {

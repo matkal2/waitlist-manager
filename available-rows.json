@@ -1,0 +1,477 @@
+[
+  {
+    "col_0": {
+      "value": "Broadway"
+    },
+    "col_1": {
+      "value": "Buena Park"
+    },
+    "col_2": {
+      "value": "4027 N. BROADWAY, CHICAGO, IL 60613"
+    },
+    "col_3": {
+      "value": "broadway"
+    },
+    "col_4": {
+      "value": "broadway 405"
+    },
+    "col_5": {
+      "value": "Available"
+    },
+    "col_6": {
+      "value": "4027 N. Broadway \nUnit: 405"
+    },
+    "col_7": {
+      "value": "2"
+    },
+    "col_8": {
+      "value": "2"
+    },
+    "col_9": {
+      "value": "972"
+    },
+    "col_10": {
+      "value": "5/5/2026"
+    },
+    "col_11": {
+      "value": "$3,228.00"
+    },
+    "col_12": {
+      "value": "3228"
+    },
+    "col_13": {
+      "value": "N/A"
+    },
+    "col_14": {
+      "value": "NONE AVAILABLE"
+    },
+    "col_15": {
+      "value": "Spec Images"
+    },
+    "col_16": {
+      "value": "Floor Plan"
+    },
+    "col_17": {
+      "value": "Different Unit"
+    },
+    "col_18": {
+      "value": "46058"
+    },
+    "col_19": {
+      "value": "#REF!"
+    },
+    "col_20": {
+      "value": "#REF!"
+    },
+    "col_21": {
+      "value": "#REF!"
+    },
+    "col_22": {},
+    "col_23": {
+      "value": "#N/A"
+    },
+    "col_24": {
+      "value": "#N/A"
+    },
+    "col_25": {
+      "value": "#N/A"
+    },
+    "col_26": {
+      "value": "NO ERROR"
+    },
+    "col_27": {
+      "value": "NO ERROR"
+    },
+    "col_28": {
+      "value": 1,
+      "formatted": "1"
+    },
+    "col_29": {
+      "value": "1N"
+    },
+    "col_30": {},
+    "col_31": {
+      "value": null
+    }
+  },
+  {
+    "col_0": {
+      "value": "Broadway"
+    },
+    "col_1": {
+      "value": "Buena Park"
+    },
+    "col_2": {
+      "value": "4027 N. BROADWAY, CHICAGO, IL 60613"
+    },
+    "col_3": {
+      "value": "broadway"
+    },
+    "col_4": {
+      "value": "broadway 505"
+    },
+    "col_5": {
+      "value": "Available"
+    },
+    "col_6": {
+      "value": "4027 N. Broadway \nUnit: 505"
+    },
+    "col_7": {
+      "value": "2"
+    },
+    "col_8": {
+      "value": "2"
+    },
+    "col_9": {
+      "value": "972"
+    },
+    "col_10": {
+      "value": "ASAP"
+    },
+    "col_11": {
+      "value": "$3,290.00"
+    },
+    "col_12": {
+      "value": "3290"
+    },
+    "col_13": {
+      "value": "N/A"
+    },
+    "col_14": {
+      "value": "NONE AVAILABLE"
+    },
+    "col_15": {
+      "value": "Spec Images"
+    },
+    "col_16": {
+      "value": "Floor Plan"
+    },
+    "col_17": {
+      "value": "Different Unit"
+    },
+    "col_18": {
+      "value": "45975"
+    },
+    "col_19": {
+      "value": "#REF!"
+    },
+    "col_20": {
+      "value": "#REF!"
+    },
+    "col_21": {
+      "value": "#REF!"
+    },
+    "col_22": {},
+    "col_23": {
+      "value": "#N/A"
+    },
+    "col_24": {
+      "value": "#N/A"
+    },
+    "col_25": {
+      "value": "#N/A"
+    },
+    "col_26": {
+      "value": "NO ERROR"
+    },
+    "col_27": {
+      "value": "NO ERROR"
+    },
+    "col_28": {
+      "value": 1,
+      "formatted": "1"
+    },
+    "col_29": {
+      "value": "1S"
+    },
+    "col_30": {},
+    "col_31": {
+      "value": null
+    }
+  },
+  {
+    "col_0": {
+      "value": "Broadway"
+    },
+    "col_1": {
+      "value": "Buena Park"
+    },
+    "col_2": {
+      "value": "4027 N. BROADWAY, CHICAGO, IL 60613"
+    },
+    "col_3": {
+      "value": "broadway"
+    },
+    "col_4": {
+      "value": "broadway 601"
+    },
+    "col_5": {
+      "value": "Available"
+    },
+    "col_6": {
+      "value": "4027 N. Broadway \nUnit: 601"
+    },
+    "col_7": {
+      "value": "4"
+    },
+    "col_8": {
+      "value": "4"
+    },
+    "col_9": {
+      "value": "2,257"
+    },
+    "col_10": {
+      "value": "3/1/2026"
+    },
+    "col_11": {
+      "value": "$5,401.00"
+    },
+    "col_12": {
+      "value": "5401"
+    },
+    "col_13": {
+      "value": "N/A"
+    },
+    "col_14": {
+      "value": "NONE AVAILABLE"
+    },
+    "col_15": {
+      "value": "Photos"
+    },
+    "col_16": {
+      "value": "Floor Plan"
+    },
+    "col_17": {
+      "value": "Different Unit"
+    },
+    "col_18": {
+      "value": "45978"
+    },
+    "col_19": {
+      "value": "#REF!"
+    },
+    "col_20": {
+      "value": "#REF!"
+    },
+    "col_21": {
+      "value": "#REF!"
+    },
+    "col_22": {},
+    "col_23": {
+      "value": "#N/A"
+    },
+    "col_24": {
+      "value": "#N/A"
+    },
+    "col_25": {
+      "value": "#N/A"
+    },
+    "col_26": {
+      "value": "NO ERROR"
+    },
+    "col_27": {
+      "value": "NO ERROR"
+    },
+    "col_28": {
+      "value": 1,
+      "formatted": "1"
+    },
+    "col_29": {
+      "value": "1T"
+    },
+    "col_30": {},
+    "col_31": {
+      "value": null
+    }
+  },
+  {
+    "col_0": {
+      "value": "Countryside_T"
+    },
+    "col_1": {
+      "value": "Countryside Townhomes"
+    },
+    "col_2": {
+      "value": "10766-10711 CLOCKTOWER DR., Countryside, IL 60525"
+    },
+    "col_3": {
+      "value": "csidet"
+    },
+    "col_4": {
+      "value": "csidet 10727"
+    },
+    "col_5": {
+      "value": "Available"
+    },
+    "col_6": {
+      "value": "10727 Clocktower Dr \nUnit: 10727"
+    },
+    "col_7": {
+      "value": "4"
+    },
+    "col_8": {
+      "value": "3.5"
+    },
+    "col_9": {
+      "value": "2,742"
+    },
+    "col_10": {
+      "value": "ASAP"
+    },
+    "col_11": {
+      "value": "$4,800.00"
+    },
+    "col_12": {
+      "value": "4800"
+    },
+    "col_13": {
+      "value": "N/A"
+    },
+    "col_14": {
+      "value": "Same Floor Plan"
+    },
+    "col_15": {
+      "value": "Photos"
+    },
+    "col_16": {
+      "value": "Floor Plan"
+    },
+    "col_17": {
+      "value": "Same Floor Plan"
+    },
+    "col_18": {
+      "value": "45994"
+    },
+    "col_19": {
+      "value": "#REF!"
+    },
+    "col_20": {
+      "value": "#REF!"
+    },
+    "col_21": {
+      "value": "#REF!"
+    },
+    "col_22": {},
+    "col_23": {
+      "value": "#N/A"
+    },
+    "col_24": {
+      "value": "#N/A"
+    },
+    "col_25": {
+      "value": "#N/A"
+    },
+    "col_26": {
+      "value": "NO ERROR"
+    },
+    "col_27": {
+      "value": "NO ERROR"
+    },
+    "col_28": {
+      "value": 3,
+      "formatted": "3"
+    },
+    "col_29": {
+      "value": "3I"
+    },
+    "col_30": {},
+    "col_31": {
+      "value": null
+    }
+  },
+  {
+    "col_0": {
+      "value": "Countryside_T"
+    },
+    "col_1": {
+      "value": "Countryside Townhomes"
+    },
+    "col_2": {
+      "value": "10766-10711 CLOCKTOWER DR., Countryside, IL 60525"
+    },
+    "col_3": {
+      "value": "csidet"
+    },
+    "col_4": {
+      "value": "csidet 10752"
+    },
+    "col_5": {
+      "value": "Available"
+    },
+    "col_6": {
+      "value": "10752 Clocktower Dr \nUnit: 10752"
+    },
+    "col_7": {
+      "value": "4"
+    },
+    "col_8": {
+      "value": "3.5"
+    },
+    "col_9": {
+      "value": "2,742"
+    },
+    "col_10": {
+      "value": "6/1/2026"
+    },
+    "col_11": {
+      "value": "$4,852.00"
+    },
+    "col_12": {
+      "value": "4852"
+    },
+    "col_13": {
+      "value": "N/A"
+    },
+    "col_14": {
+      "value": "Same Floor Plan"
+    },
+    "col_15": {
+      "value": "Photos"
+    },
+    "col_16": {
+      "value": "Floor Plan"
+    },
+    "col_17": {
+      "value": "Same Floor Plan"
+    },
+    "col_18": {
+      "value": "46063"
+    },
+    "col_19": {
+      "value": "#REF!"
+    },
+    "col_20": {
+      "value": "#REF!"
+    },
+    "col_21": {
+      "value": "#REF!"
+    },
+    "col_22": {},
+    "col_23": {
+      "value": "#N/A"
+    },
+    "col_24": {
+      "value": "#N/A"
+    },
+    "col_25": {
+      "value": "#N/A"
+    },
+    "col_26": {
+      "value": "NO ERROR"
+    },
+    "col_27": {
+      "value": "NO ERROR"
+    },
+    "col_28": {
+      "value": 3,
+      "formatted": "3"
+    },
+    "col_29": {
+      "value": "3P"
+    },
+    "col_30": {},
+    "col_31": {
+      "value": null
+    }
+  }
+]
