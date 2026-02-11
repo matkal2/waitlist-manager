@@ -226,7 +226,8 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
     if (currentLeaseIsFuture) {
       futureTenantCode = tenantCode;
       const futureEntry = tenantCode ? directoryMap.get(tenantCode) : null;
-      futureTenantName = futureEntry?.residentName || null;
+      // Fallback: show tenant code if not in Directory
+      futureTenantName = futureEntry?.residentName || (tenantCode ? `(${tenantCode})` : null);
       futureUnitNumber = futureEntry?.unitNumber || null;
       effectiveFutureStartDate = leaseStartDate;
       hasFutureTenant = true;
@@ -238,7 +239,8 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
     // For current tenant display, don't show if their lease hasn't started yet
     const effectiveTenantCode = currentLeaseIsFuture ? null : tenantCode;
     const directoryEntry = effectiveTenantCode ? directoryMap.get(effectiveTenantCode) : null;
-    const tenantName = directoryEntry?.residentName || null;
+    // Fallback: if tenant code exists but not in Directory, show code as name indicator
+    const tenantName = directoryEntry?.residentName || (effectiveTenantCode ? `(${effectiveTenantCode})` : null);
     const unitNumber = directoryEntry?.unitNumber || null;
     
     // For Notice spots, available date is the day after termination
