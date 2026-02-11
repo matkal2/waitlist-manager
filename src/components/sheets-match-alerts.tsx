@@ -68,10 +68,12 @@ export function SheetsMatchAlerts({ units, waitlistEntries, onMatchCountChange }
       .from('waitlist_entries')
       .update({ outcome_status: 'active' })
       .eq('id', entryId)
-      .eq('outcome_status', 'matched'); // Only reset if currently matched
+      .in('outcome_status', ['matched', null]); // Only reset if matched or null (not touring/applied/leased)
     
     if (error) {
       console.error('Failed to reset outcome_status:', error);
+    } else {
+      console.log(`[Match Alert] Reset entry ${entryId} outcome to active`);
     }
   };
 

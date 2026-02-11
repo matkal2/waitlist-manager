@@ -182,7 +182,7 @@ export function WaitlistReports() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-7 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
             <MetricCard 
               icon={<Users className="h-4 w-4" />}
               label="Total Entries"
@@ -241,7 +241,7 @@ export function WaitlistReports() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-7 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
             <MetricCard 
               icon={<Users className="h-4 w-4" />}
               label="Total Entries"
