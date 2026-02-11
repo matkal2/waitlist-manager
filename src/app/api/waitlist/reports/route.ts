@@ -41,18 +41,16 @@ function calculateMetrics(
     return d >= startDate && d <= endDate;
   };
   
-  // Filter entries created in this period
+  // Filter entries created in this period (for counting new entries)
   const entriesInPeriod = entries.filter(e => inRange(e.created_at));
   
   // Count self vs agent entries using the helper
   const selfEntries = entriesInPeriod.filter(e => isSelfAdded(e)).length;
   const agentEntries = entriesInPeriod.length - selfEntries;
   
-  // Count matches: entries whose email appears in notified_emails of any unit
-  // OR entries with matched_at timestamp in this period
-  const matchedInPeriod = entriesInPeriod.filter(e => 
-    matchedEmails.has(e.email?.toLowerCase()) || inRange(e.matched_at)
-  ).length;
+  // Count matches that OCCURRED in this period (matched_at in range)
+  // This counts all matches regardless of when entry was created
+  const matchedInPeriod = entries.filter(e => inRange(e.matched_at)).length;
   
   return {
     totalEntries: entriesInPeriod.length,
