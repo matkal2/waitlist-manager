@@ -127,9 +127,20 @@ async function fetchDirectory(): Promise<Map<string, DirectoryEntry>> {
     if (!cells) continue;
     
     // Column B (index 1) = Unit Number, Column C (index 2) = Tenant Code, Column D (index 3) = Resident Name
-    const unitNumber = cells[1]?.v?.toString() || cells[1]?.f?.toString() || null;
+    // Column S (index 18) = Unique ID (e.g., "elston 3434-101")
+    let unitNumber = cells[1]?.v?.toString() || cells[1]?.f?.toString() || null;
     const tenantCode = cells[2]?.v?.toString() || '';
     const residentName = cells[3]?.v?.toString() || '';
+    const uniqueId = cells[18]?.v?.toString() || '';
+    
+    // If unitNumber is empty, try to extract from uniqueId (format: "project unit-number")
+    // Examples: "elston 3434-101" -> "3434-101", "elston 3434-G1" -> "3434-G1"
+    if (!unitNumber && uniqueId) {
+      const parts = uniqueId.split(' ');
+      if (parts.length >= 2) {
+        unitNumber = parts.slice(1).join(' '); // Everything after the project name
+      }
+    }
     
     if (tenantCode && residentName) {
       directoryMap.set(tenantCode, { residentName, unitNumber });
