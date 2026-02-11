@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Waitlist & Parking Manager - Owner Presentation</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; color: #fff; }
+    
+    .slide {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 60px;
+      border-bottom: 2px solid #333;
+    }
+    
+    .slide:nth-child(odd) { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); }
+    .slide:nth-child(even) { background: linear-gradient(135deg, #16213e 0%, #0f3460 100%); }
+    
+    h1 { font-size: 3.5rem; margin-bottom: 20px; text-align: center; color: #e94560; }
+    h2 { font-size: 2.5rem; margin-bottom: 30px; text-align: center; color: #fff; }
+    h3 { font-size: 1.8rem; margin-bottom: 20px; color: #e94560; }
+    
+    .subtitle { font-size: 1.5rem; color: #aaa; margin-bottom: 40px; }
+    
+    .content { max-width: 1000px; width: 100%; }
+    
+    ul { font-size: 1.4rem; line-height: 2; margin-left: 40px; }
+    li { margin-bottom: 10px; }
+    li::marker { color: #e94560; }
+    
+    .highlight { color: #4ecca3; font-weight: bold; }
+    .accent { color: #e94560; }
+    
+    .diagram {
+      background: #0d1b2a;
+      border-radius: 15px;
+      padding: 40px;
+      font-family: 'Courier New', monospace;
+      font-size: 1.1rem;
+      white-space: pre;
+      line-height: 1.6;
+      margin: 20px 0;
+      border: 2px solid #4ecca3;
+    }
+    
+    .box-container {
+      display: flex;
+      gap: 30px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 30px;
+    }
+    
+    .box {
+      background: rgba(255,255,255,0.1);
+      border-radius: 15px;
+      padding: 30px;
+      min-width: 280px;
+      text-align: center;
+      border: 2px solid #4ecca3;
+    }
+    
+    .box h4 { color: #4ecca3; font-size: 1.3rem; margin-bottom: 15px; }
+    .box p { font-size: 1.1rem; color: #ccc; }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 1.2rem;
+    }
+    
+    th { background: #e94560; padding: 15px; text-align: left; }
+    td { background: rgba(255,255,255,0.05); padding: 15px; border-bottom: 1px solid #333; }
+    tr:hover td { background: rgba(255,255,255,0.1); }
+    
+    .status-badge {
+      display: inline-block;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 0.9rem;
+    }
+    
+    .status-occupied { background: #3b82f6; }
+    .status-vacant { background: #22c55e; }
+    .status-notice { background: #eab308; color: #000; }
+    .status-reserved { background: #a855f7; }
+    
+    .flow-arrow {
+      font-size: 3rem;
+      color: #4ecca3;
+      margin: 20px 0;
+    }
+    
+    .nav {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: flex;
+      gap: 10px;
+      z-index: 100;
+    }
+    
+    .nav button {
+      background: #e94560;
+      color: #fff;
+      border: none;
+      padding: 15px 25px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: transform 0.2s;
+    }
+    
+    .nav button:hover { transform: scale(1.1); }
+    
+    .slide-num {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      font-size: 1rem;
+      color: #666;
+    }
+    
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      width: 100%;
+    }
+    
+    @media (max-width: 768px) {
+      .slide { padding: 30px; }
+      h1 { font-size: 2.5rem; }
+      h2 { font-size: 1.8rem; }
+      ul { font-size: 1.1rem; }
+      .two-col { grid-template-columns: 1fr; }
+      .box-container { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Slide 1: Title -->
+<div class="slide" id="slide1">
+  <h1>Waitlist & Parking Manager</h1>
+  <p class="subtitle">Automated Property Management Portal</p>
+  <div class="box-container">
+    <div class="box">
+      <h4>Waitlist Management</h4>
+      <p>Track applicants waiting for units</p>
+    </div>
+    <div class="box">
+      <h4>Parking Management</h4>
+      <p>Monitor all parking spot assignments</p>
+    </div>
+    <div class="box">
+      <h4>Match Alerts</h4>
+      <p>Automatic notifications when units match</p>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 2: What Is This? -->
+<div class="slide" id="slide2">
+  <h2>What Is This System?</h2>
+  <div class="content">
+    <ul>
+      <li><span class="highlight">Web-based portal</span> accessible from any browser</li>
+      <li>Manages <span class="accent">Unit Waitlist</span> - who wants to move in</li>
+      <li>Manages <span class="accent">Parking Spots</span> - occupied, vacant, or ending soon</li>
+      <li>Provides <span class="accent">Match Alerts</span> - automatic matching of units to waitlist</li>
+      <li>Processes <span class="accent">Change Requests</span> - parking assignments & terminations</li>
+    </ul>
+    <div class="diagram" style="margin-top: 40px; text-align: center;">
+✅ All data stays in sync with your existing Google Sheets
+✅ No double entry required!
+    </div>
+  </div>
+</div>
+
+<!-- Slide 3: System Overview -->
+<div class="slide" id="slide3">
+  <h2>How It Works - Simple Overview</h2>
+  <div class="content">
+    <div class="diagram">
+    ┌─────────────────────────┐
+    │     GOOGLE SHEETS       │  ← Your existing data lives here
+    │   (Waitlist, Parking)   │
+    └───────────┬─────────────┘
+                │
+                │ READS data automatically
+                ▼
+    ┌─────────────────────────┐
+    │      WEB PORTAL         │  ← Staff access in browser
+    │   (Dashboard & Forms)   │
+    └───────────┬─────────────┘
+                │
+                │ WRITES changes back
+                ▼
+    ┌─────────────────────────┐
+    │     GOOGLE SHEETS       │  ← Changes saved to OUTPUT tab
+    │     (OUTPUT Tab)        │
+    └─────────────────────────┘
+    </div>
+  </div>
+</div>
+
+<!-- Slide 4: Data Sources -->
+<div class="slide" id="slide4">
+  <h2>Where Does The Data Come From?</h2>
+  <div class="content">
+    <table>
+      <tr>
+        <th>Google Sheet</th>
+        <th>What It Contains</th>
+      </tr>
+      <tr>
+        <td><strong>Dash</strong></td>
+        <td>Available units, rent prices, availability dates</td>
+      </tr>
+      <tr>
+        <td><strong>Waitlist</strong></td>
+        <td>People waiting for units (name, contact, preferences)</td>
+      </tr>
+      <tr>
+        <td><strong>Directory</strong></td>
+        <td>All current tenants and their unit numbers</td>
+      </tr>
+      <tr>
+        <td><strong>Import</strong></td>
+        <td>Parking spot assignments and status</td>
+      </tr>
+    </table>
+    <div class="diagram" style="text-align: center; margin-top: 30px;">
+🔄 The portal pulls FRESH data every time you open it - always up to date!
+    </div>
+  </div>
+</div>
+
+<!-- Slide 5: Login Security -->
+<div class="slide" id="slide5">
+  <h2>How Does Login Work?</h2>
+  <div class="content">
+    <div class="two-col">
+      <div class="box">
+        <h4>🔐 Email/Password Login</h4>
+        <p>Staff register with email</p>
+        <p>Admin approves new users</p>
+        <p>Passwords securely encrypted</p>
+      </div>
+      <div class="box">
+        <h4>👤 Role-Based Access</h4>
+        <p><strong>Admin</strong> - Full access, approve users</p>
+        <p><strong>User</strong> - View and manage data</p>
+      </div>
+    </div>
+    <div class="diagram" style="text-align: center; margin-top: 40px;">
+All login data stored in Supabase (secure cloud database)
+    </div>
+  </div>
+</div>
+
+<!-- Slide 6: Waitlist Manager -->
+<div class="slide" id="slide6">
+  <h2>Waitlist Manager</h2>
+  <div class="content">
+    <div class="box-container">
+      <div class="box">
+        <h4>Step 1: Data Sync</h4>
+        <p>Reads "Dash" tab for available units</p>
+        <p>Reads "Waitlist" tab for entries</p>
+      </div>
+      <div class="box">
+        <h4>Step 2: Display</h4>
+        <p>Shows all waitlist entries</p>
+        <p>Shows all available units</p>
+      </div>
+      <div class="box">
+        <h4>Step 3: Match Alerts</h4>
+        <p>Finds automatic matches</p>
+        <p>Notifies staff of opportunities</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 7: Matching Logic -->
+<div class="slide" id="slide7">
+  <h2>How Matching Works</h2>
+  <div class="content">
+    <div class="diagram">
+    For each WAITLIST ENTRY:
+    ├─ What unit type? (Studio, 1BR, 2BR, etc.)
+    ├─ What property? (Broadway, Elston, etc.)
+    └─ When do they want to move?
+
+    For each AVAILABLE UNIT:
+    ├─ What type is it?
+    ├─ What property is it at?
+    └─ When is it available?
+
+    IF all three criteria match → 🚨 SHOW ALERT!
+    </div>
+    <p style="text-align: center; font-size: 1.3rem; margin-top: 30px;">
+      Staff can then <span class="highlight">contact the person</span> and offer the unit!
+    </p>
+  </div>
+</div>
+
+<!-- Slide 8: Parking Manager -->
+<div class="slide" id="slide8">
+  <h2>Parking Manager</h2>
+  <div class="content">
+    <h3>Spot Statuses</h3>
+    <div class="box-container">
+      <div class="box">
+        <span class="status-badge status-occupied">OCCUPIED</span>
+        <p style="margin-top: 15px;">Tenant currently using spot</p>
+      </div>
+      <div class="box">
+        <span class="status-badge status-vacant">VACANT</span>
+        <p style="margin-top: 15px;">Spot is empty and available</p>
+      </div>
+      <div class="box">
+        <span class="status-badge status-notice">NOTICE</span>
+        <p style="margin-top: 15px;">Tenant leaving soon</p>
+      </div>
+      <div class="box">
+        <span class="status-badge status-reserved">RESERVED</span>
+        <p style="margin-top: 15px;">Spot held for someone</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 9: Parking Info -->
+<div class="slide" id="slide9">
+  <h2>Parking Spot Information</h2>
+  <div class="content">
+    <table>
+      <tr>
+        <th>Field</th>
+        <th>Description</th>
+      </tr>
+      <tr><td>Property</td><td>Which building (Warren, Elston, Broadway, etc.)</td></tr>
+      <tr><td>Spot Number</td><td>The parking space ID</td></tr>
+      <tr><td>Type</td><td>Indoor or Outdoor</td></tr>
+      <tr><td>Monthly Rent</td><td>What tenant pays</td></tr>
+      <tr><td>Current Tenant</td><td>Name and unit number</td></tr>
+      <tr><td>Lease Start</td><td>When they started</td></tr>
+      <tr><td>Termination Date</td><td>When they're leaving (if applicable)</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- Slide 10: Change Requests -->
+<div class="slide" id="slide10">
+  <h2>Parking Change Requests</h2>
+  <div class="content">
+    <div class="box-container">
+      <div class="box">
+        <h4>➕ Add Tenant</h4>
+        <p>Pick an empty spot</p>
+        <p>Assign a tenant</p>
+        <p>Set start date & rent</p>
+      </div>
+      <div class="box">
+        <h4>❌ Terminate</h4>
+        <p>Select occupied spot</p>
+        <p>Set termination date</p>
+        <p>Spot becomes Vacant</p>
+      </div>
+      <div class="box">
+        <h4>🔄 Transfer</h4>
+        <p>Move tenant to new spot</p>
+        <p>Old spot → Vacant</p>
+        <p>New spot → Occupied</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 11: How Changes Save -->
+<div class="slide" id="slide11">
+  <h2>How Changes Get Saved</h2>
+  <div class="content">
+    <div class="diagram">
+    1. User fills out the form in the portal
+                    ↓
+    2. Portal writes a new row to "OUTPUT" tab
+                    ↓
+    3. Main parking sheet reads from OUTPUT
+                    ↓
+    4. Main sheet updates automatically!
+    </div>
+    <div class="box-container" style="margin-top: 40px;">
+      <div class="box">
+        <h4>✅ All changes logged</h4>
+      </div>
+      <div class="box">
+        <h4>✅ See who made changes</h4>
+      </div>
+      <div class="box">
+        <h4>✅ Easy to audit</h4>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 12: Technology -->
+<div class="slide" id="slide12">
+  <h2>The Technology Stack</h2>
+  <div class="content">
+    <div class="two-col">
+      <div>
+        <h3>Frontend (What Users See)</h3>
+        <ul>
+          <li>Built with <span class="highlight">Next.js</span></li>
+          <li>Modern, responsive design</li>
+          <li>Works on desktop & mobile</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Backend (Behind the Scenes)</h3>
+        <ul>
+          <li><span class="highlight">Vercel</span> - Hosts the website</li>
+          <li><span class="highlight">Supabase</span> - User accounts</li>
+          <li><span class="highlight">Google Sheets API</span> - Data</li>
+        </ul>
+      </div>
+    </div>
+    <div class="diagram" style="text-align: center; margin-top: 40px;">
+💰 Cost: Minimal - uses free tiers of all services
+    </div>
+  </div>
+</div>
+
+<!-- Slide 13: Benefits -->
+<div class="slide" id="slide13">
+  <h2>Benefits for Your Team</h2>
+  <div class="content">
+    <table>
+      <tr>
+        <th>Before ❌</th>
+        <th>After ✅</th>
+      </tr>
+      <tr>
+        <td>Check multiple sheets manually</td>
+        <td>One dashboard shows everything</td>
+      </tr>
+      <tr>
+        <td>Manually match waitlist to units</td>
+        <td>Automatic match alerts</td>
+      </tr>
+      <tr>
+        <td>Email/call without tracking</td>
+        <td>Track who was notified</td>
+      </tr>
+      <tr>
+        <td>Paper parking change forms</td>
+        <td>Digital forms with history</td>
+      </tr>
+      <tr>
+        <td>No visibility into parking status</td>
+        <td>Real-time status dashboard</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- Slide 14: Security -->
+<div class="slide" id="slide14">
+  <h2>Security Features</h2>
+  <div class="content">
+    <div class="box-container">
+      <div class="box">
+        <h4>🔒 Login Required</h4>
+        <p>No public access</p>
+      </div>
+      <div class="box">
+        <h4>✓ Admin Approval</h4>
+        <p>New users must be approved</p>
+      </div>
+      <div class="box">
+        <h4>🔐 HTTPS Encryption</h4>
+        <p>All data transmitted securely</p>
+      </div>
+      <div class="box">
+        <h4>📋 Audit Trail</h4>
+        <p>All changes logged</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Slide 15: Future -->
+<div class="slide" id="slide15">
+  <h2>Future Enhancements</h2>
+  <div class="content">
+    <ul>
+      <li>Automated email notifications to waitlist matches</li>
+      <li>Parking permit tracking</li>
+      <li>Lease-end reminders</li>
+      <li>Mobile app version</li>
+      <li>More detailed reporting</li>
+    </ul>
+    <div class="diagram" style="text-align: center; margin-top: 40px;">
+💡 Your feedback drives new features!
+    </div>
+  </div>
+</div>
+
+<!-- Slide 16: Thank You -->
+<div class="slide" id="slide16">
+  <h1>Thank You!</h1>
+  <p class="subtitle">Questions?</p>
+  <div class="box-container">
+    <div class="box">
+      <h4>🌐 Portal URL</h4>
+      <p>https://waitlist-hpvg.vercel.app</p>
+    </div>
+  </div>
+</div>
+
+<!-- Navigation -->
+<div class="nav">
+  <button onclick="prevSlide()">← Prev</button>
+  <button onclick="nextSlide()">Next →</button>
+</div>
+
+<script>
+  let currentSlide = 1;
+  const totalSlides = 16;
+  
+  function goToSlide(n) {
+    document.getElementById(`slide${n}`).scrollIntoView({ behavior: 'smooth' });
+    currentSlide = n;
+  }
+  
+  function nextSlide() {
+    if (currentSlide < totalSlides) {
+      currentSlide++;
+      goToSlide(currentSlide);
+    }
+  }
+  
+  function prevSlide() {
+    if (currentSlide > 1) {
+      currentSlide--;
+      goToSlide(currentSlide);
+    }
+  }
+  
+  // Keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+    if (e.key === 'ArrowLeft') prevSlide();
+  });
+</script>
+
+</body>
+</html>

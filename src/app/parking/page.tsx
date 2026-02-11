@@ -92,6 +92,7 @@ export default function ParkingPage() {
   const [activitySearch, setActivitySearch] = useState<string>('');
   
   // Filters
+  const [activeTab, setActiveTab] = useState<string>('inventory');
   const [propertyFilter, setPropertyFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -555,7 +556,13 @@ export default function ParkingPage() {
           </Card>
         </div>
 
-        <Tabs defaultValue="inventory" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={(tab) => {
+          setActiveTab(tab);
+          // Reset to all properties when switching to Tracking tab
+          if (tab === 'tracking') {
+            setPropertyFilter('all');
+          }
+        }} className="space-y-4">
           <TabsList>
             <TabsTrigger value="inventory">
               <span className="flex items-center gap-2">
