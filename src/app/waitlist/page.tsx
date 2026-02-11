@@ -220,7 +220,9 @@ export default function WaitlistPage() {
       
       if (e.status !== 'Active') return false;
       if (e.property !== unit.property) return false;
-      if (e.unit_type_pref !== unit.unit_type) return false;
+      // Match unit type - supports multiple unit types (comma-separated)
+      const entryUnitTypes = e.unit_type_pref.split(',').map(t => t.trim());
+      if (!entryUnitTypes.includes(unit.unit_type)) return false;
       
       const entryMoveInStart = new Date(e.move_in_date);
       entryMoveInStart.setHours(0, 0, 0, 0);
