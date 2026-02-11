@@ -191,9 +191,17 @@ export function SheetsUnits({ onUnitsLoaded }: SheetsUnitsProps) {
                     ${unit.rent_price.toLocaleString()}/mo
                   </TableCell>
                   <TableCell>
-                    {unit.available_date 
-                      ? new Date(unit.available_date).toLocaleDateString()
-                      : 'Now'
+                    {!unit.available_date || unit.available_date.toLowerCase() === 'now'
+                      ? 'Now'
+                      : (() => {
+                          // Parse YYYY-MM-DD as local date to avoid timezone shift
+                          const parts = unit.available_date.split('-');
+                          if (parts.length === 3) {
+                            const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                            return date.toLocaleDateString();
+                          }
+                          return unit.available_date;
+                        })()
                     }
                   </TableCell>
                   <TableCell>

@@ -92,7 +92,13 @@ export function SheetsMatchAlerts({ units, waitlistEntries, onMatchCountChange }
         if (isAvailableNow) {
           unitAvailable = today;
         } else {
-          unitAvailable = new Date(unit.available_date!);
+          // Parse YYYY-MM-DD as local date to avoid timezone shift
+          const parts = unit.available_date!.split('-');
+          if (parts.length === 3) {
+            unitAvailable = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+          } else {
+            unitAvailable = new Date(unit.available_date!);
+          }
           unitAvailable.setHours(0, 0, 0, 0);
         }
         
@@ -302,7 +308,16 @@ export function SheetsMatchAlerts({ units, waitlistEntries, onMatchCountChange }
                     </span>
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      {unit.available_date ? new Date(unit.available_date).toLocaleDateString() : 'Now'}
+                      {!unit.available_date || unit.available_date.toLowerCase() === 'now'
+                        ? 'Now'
+                        : (() => {
+                            const parts = unit.available_date.split('-');
+                            if (parts.length === 3) {
+                              const date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                              return date.toLocaleDateString();
+                            }
+                            return unit.available_date;
+                          })()}
                     </span>
                   </div>
                 </div>
