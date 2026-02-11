@@ -28,9 +28,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase';
-import { ArrowUpDown, Search, UserCircle, Trash2, ChevronDown, ChevronUp, Pencil, FileText, Phone } from 'lucide-react';
+import { ArrowUpDown, Search, UserCircle, ChevronDown, ChevronUp, Pencil, FileText, Phone } from 'lucide-react';
 import { PROPERTY_UNITS } from '@/lib/property-units';
 import { getPropertyNicknames } from '@/lib/properties';
+import { OutcomeTracker } from '@/components/outcome-tracker';
 
 // Map user emails to agent names
 const EMAIL_TO_AGENT: Record<string, string> = {
@@ -599,8 +600,8 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
               </TableHead>
               <TableHead className="w-[110px]">Agent</TableHead>
               <TableHead className="w-[90px]">Contacted</TableHead>
-              <TableHead className="w-[130px]">Status</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableHead className="w-[100px]">Outcome</TableHead>
+              <TableHead className="w-[80px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -691,17 +692,12 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()} className="pr-2">
-                        <select
-                          value={entry.status}
-                          onChange={(e) => handleStatusChange(entry.id, e.target.value)}
-                          className="w-full max-w-[120px] px-2 py-1 text-sm rounded-md border border-input bg-background cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring"
-                        >
-                          <option value="Active">Active</option>
-                          <option value="Showing Scheduled">Showing</option>
-                          <option value="Applied">Applied</option>
-                          <option value="Signed Lease">Signed</option>
-                        </select>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <OutcomeTracker 
+                          entryId={entry.id} 
+                          currentStatus={entry.outcome_status} 
+                          onUpdate={onRefresh}
+                        />
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()} className="pl-0">
                         <div className="flex items-center gap-0">
@@ -723,21 +719,12 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={canModify ? "text-red-500 hover:text-red-700 hover:bg-red-50" : "text-gray-300 cursor-not-allowed"}
-                            onClick={() => handleDelete(entry.id, entry.full_name, entry)}
-                            disabled={!canModify}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
                     {isExpanded && (
                       <TableRow key={`${entry.id}-expanded`} className="bg-muted/30">
-                        <TableCell colSpan={11} className="p-4">
+                        <TableCell colSpan={10} className="p-4">
                           <div>
                             <h4 className="font-semibold text-sm mb-2">Internal Notes</h4>
                             <div className="text-sm text-muted-foreground bg-white dark:bg-gray-800 p-3 rounded border min-h-[60px] max-w-full whitespace-pre-wrap break-words">

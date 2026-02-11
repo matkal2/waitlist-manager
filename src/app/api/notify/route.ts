@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { createClient } from '@supabase/supabase-js';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Production agent emails
 const AGENT_EMAILS: Record<string, string> = {
@@ -118,6 +123,25 @@ export async function POST(request: NextRequest) {
           error: error.message,
           agentEmail 
         }, { status: 500 });
+      }
+
+      // Track matches in database - update waitlist entries with matched_at timestamp
+      const contactEmails = contacts.map(c => c.email?.toLowerCase()).filter(Boolean);
+      if (contactEmails.length > 0) {
+        const { error: updateError } = await supabase
+          .from('waitlist_entries')
+          .update({ 
+            matched_at: new Date().toISOString(),
+            outcome_status: 'matched'
+          })
+          .in('email', contactEmails)
+          .is('matched_at', null); // Only update if not already matched
+        
+        if (updateError) {
+          console.error('Failed to update matched_at:', updateError);
+        } else {
+          console.log(`[Notify] Updated ${contactEmails.length} entries with matched_at`);
+        }
       }
 
       return NextResponse.json({

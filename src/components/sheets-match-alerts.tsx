@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bell, Mail, Phone, User, Home, DollarSign, Calendar, X } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 interface SheetUnit {
   property: string;
@@ -49,8 +50,8 @@ export function SheetsMatchAlerts({ units, waitlistEntries, onMatchCountChange }
     return new Set();
   });
 
-  // Save dismissed alerts to localStorage (permanent)
-  const dismissAlert = (unitId: string, entryId: string) => {
+  // Save dismissed alerts to localStorage (permanent) and reset outcome to Active
+  const dismissAlert = async (unitId: string, entryId: string) => {
     const key = `${unitId}:${entryId}`;
     setDismissedAlerts(prev => {
       const updated = new Set(prev);
@@ -60,6 +61,18 @@ export function SheetsMatchAlerts({ units, waitlistEntries, onMatchCountChange }
       }
       return updated;
     });
+    
+    // Reset outcome_status back to 'active' when archiving a match
+    // This doesn't affect reporting since matches are only counted once via matched_at
+    const { error } = await supabase
+      .from('waitlist_entries')
+      .update({ outcome_status: 'active' })
+      .eq('id', entryId)
+      .eq('outcome_status', 'matched'); // Only reset if currently matched
+    
+    if (error) {
+      console.error('Failed to reset outcome_status:', error);
+    }
   };
 
   // Check if an alert is dismissed

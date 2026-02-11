@@ -58,6 +58,8 @@ export async function POST(request: NextRequest) {
         internal_notes: pending.notes ? `[Self-registered] ${pending.notes}` : '[Self-registered via public form]',
         is_section_8: false,
         extended_retention: false,
+        entry_source: 'self',
+        outcome_status: 'active',
       })
       .select('id')
       .single();

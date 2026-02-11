@@ -10,6 +10,7 @@ import { WaitlistTable } from '@/components/waitlist-table';
 import { SheetsUnits } from '@/components/sheets-units';
 import { SheetsMatchAlerts } from '@/components/sheets-match-alerts';
 import { ActivityLogView } from '@/components/activity-log';
+import { WaitlistReports } from '@/components/waitlist-reports';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Building2, Users, Clock, Home as HomeIcon, Bell, LogOut, History, User, Key, Shield, ArrowLeft } from 'lucide-react';
+import { Building2, Users, Clock, Home as HomeIcon, Bell, LogOut, History, User, Key, Shield, ArrowLeft, BarChart3 } from 'lucide-react';
 
 const ADMIN_EMAIL = 'mkaleb@hpvgproperties.com';
 
@@ -317,6 +318,12 @@ export default function WaitlistPage() {
                 Activity Log
               </span>
             </TabsTrigger>
+            <TabsTrigger value="reports">
+              <span className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Reports
+              </span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard">
@@ -382,6 +389,20 @@ export default function WaitlistPage() {
               </CardHeader>
               <CardContent>
                 <ActivityLogView onRevert={fetchEntries} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="reports">
+            <Card>
+              <CardHeader>
+                <CardTitle>Performance Reports</CardTitle>
+                <CardDescription>
+                  YTD and weekly metrics for waitlist performance tracking.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <WaitlistReports />
               </CardContent>
             </Card>
           </TabsContent>

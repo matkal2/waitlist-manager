@@ -470,6 +470,25 @@ export async function GET() {
           await recordNotifiedMatch(mk.key, mk.agent, mk.unitId, mk.entryIds);
         }
         
+        // Track matches in waitlist_entries - update matched_at for all matched entries
+        const allEntryIds = agentMatchKeys.flatMap(mk => mk.entryIds);
+        if (allEntryIds.length > 0) {
+          const { error: updateError } = await supabase
+            .from('waitlist_entries')
+            .update({ 
+              matched_at: new Date().toISOString(),
+              outcome_status: 'matched'
+            })
+            .in('id', allEntryIds)
+            .is('matched_at', null); // Only update if not already matched
+          
+          if (updateError) {
+            console.error('[Auto-notify] Failed to update matched_at:', updateError);
+          } else {
+            console.log(`[Auto-notify] Updated ${allEntryIds.length} entries with matched_at`);
+          }
+        }
+        
         notifications.push({
           agent,
           unitsCount: unitMatches.length,

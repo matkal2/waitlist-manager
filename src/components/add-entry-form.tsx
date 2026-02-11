@@ -123,6 +123,8 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
         internal_notes: (data.internal_notes as string) || null,
         is_section_8: isSection8,
         extended_retention: extendedRetention,
+        entry_source: 'agent',
+        outcome_status: 'active',
       });
 
       if (error) throw error;

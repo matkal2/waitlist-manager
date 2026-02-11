@@ -2,6 +2,8 @@ export type EntryType = 'Internal Transfer' | 'Prospect';
 export type EntryStatus = 'Active' | 'Showing Scheduled' | 'Applied' | 'Signed Lease';
 export type FloorPreference = 'Ground' | 'Middle' | 'Top' | 'No Preference';
 export type NurtureStatus = 'scheduled' | 'applied' | 'lease_signed' | null;
+export type EntrySource = 'self' | 'agent';
+export type OutcomeStatus = 'active' | 'matched' | 'touring' | 'applied' | 'leased' | 'declined' | 'removed';
 
 export interface WaitlistEntry {
   id: string;
@@ -25,6 +27,13 @@ export interface WaitlistEntry {
   extended_retention: boolean;
   last_contacted: string | null;
   nurture_status: NurtureStatus;
+  entry_source: EntrySource;
+  matched_at: string | null;
+  tour_scheduled_at: string | null;
+  applied_at: string | null;
+  lease_signed_at: string | null;
+  outcome_status: OutcomeStatus;
+  outcome_notes: string | null;
 }
 
 export type UnitStatus = 'Available' | 'Pending' | 'Leased';
