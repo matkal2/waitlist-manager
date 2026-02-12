@@ -16,6 +16,17 @@ interface ReportMetrics {
   leaseSigned: number;
 }
 
+// Normalize property names to consolidate variations (e.g., "N. Clark" -> "North Clark")
+function normalizePropertyName(property: string): string {
+  const normalizations: Record<string, string> = {
+    'N. Clark': 'North Clark',
+    'N Clark': 'North Clark',
+    'W. Montrose': 'W. Montrose',
+    'W Montrose': 'W. Montrose',
+  };
+  return normalizations[property] || property;
+}
+
 // Helper to check if entry is self-added (check both entry_source and internal_notes for backwards compatibility)
 function isSelfAdded(entry: any): boolean {
   if (entry.entry_source === 'self') return true;
@@ -99,17 +110,18 @@ export async function GET() {
       removed: entries?.filter(e => e.outcome_status === 'removed').length || 0,
     };
 
-    // Property breakdown (use isSelfAdded helper for backwards compatibility)
+    // Property breakdown (use normalized property names to consolidate variations)
     const propertyBreakdown: Record<string, { total: number; self: number; agent: number }> = {};
     entries?.forEach(e => {
-      if (!propertyBreakdown[e.property]) {
-        propertyBreakdown[e.property] = { total: 0, self: 0, agent: 0 };
+      const normalizedProperty = normalizePropertyName(e.property);
+      if (!propertyBreakdown[normalizedProperty]) {
+        propertyBreakdown[normalizedProperty] = { total: 0, self: 0, agent: 0 };
       }
-      propertyBreakdown[e.property].total++;
+      propertyBreakdown[normalizedProperty].total++;
       if (isSelfAdded(e)) {
-        propertyBreakdown[e.property].self++;
+        propertyBreakdown[normalizedProperty].self++;
       } else {
-        propertyBreakdown[e.property].agent++;
+        propertyBreakdown[normalizedProperty].agent++;
       }
     });
 
