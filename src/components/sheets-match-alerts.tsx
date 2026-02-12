@@ -283,6 +283,29 @@ export function SheetsMatchAlerts({ units, waitlistEntries, onMatchCountChange }
     }
   }, [matches.length, onMatchCountChange]);
 
+  // Auto-sync: Set outcome_status to 'matched' for entries with active (non-archived) matches
+  useEffect(() => {
+    const syncMatchedOutcomes = async () => {
+      // Get all entry IDs that have active matches (not archived)
+      const activeMatchEntryIds = matches.flatMap(m => m.entries.map(e => e.id));
+      
+      if (activeMatchEntryIds.length > 0) {
+        // Update these entries to 'matched' if they're currently 'active' or null
+        const { error } = await supabase
+          .from('waitlist_entries')
+          .update({ outcome_status: 'matched' })
+          .in('id', activeMatchEntryIds)
+          .in('outcome_status', ['active', null]);
+        
+        if (error) {
+          console.error('Failed to sync matched outcomes:', error);
+        }
+      }
+    };
+    
+    syncMatchedOutcomes();
+  }, [matches]);
+
   if (matches.length === 0) {
     return (
       <Card className="border-dashed">
