@@ -76,6 +76,17 @@ const EMAIL_TO_NAME: Record<string, string> = {
   'matthew.kaleb1763@gmail.com': 'Matthew Kaleb',
 };
 
+// Cache constants for parking data
+const PARKING_CACHE_KEY = 'cached_parking_data';
+const PARKING_CACHE_EXPIRY_HOURS = 24;
+
+interface ParkingCachedData {
+  spots: ParkingSpot[];
+  properties: string[];
+  lastUpdated: string;
+  cachedAt: number;
+}
+
 export default function ParkingPage() {
   const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
@@ -86,6 +97,7 @@ export default function ParkingPage() {
   const [loading, setLoading] = useState(true);
   const [userFullName, setUserFullName] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [isBackgroundRefresh, setIsBackgroundRefresh] = useState(false);
   const [activityFilter, setActivityFilter] = useState<string>('all');
   const [activityDateFrom, setActivityDateFrom] = useState<string>('');
   const [activityDateTo, setActivityDateTo] = useState<string>('');
@@ -111,9 +123,51 @@ export default function ParkingPage() {
   }>>([]);
   const [trendLoading, setTrendLoading] = useState(false);
 
-  const fetchData = async () => {
+  // Load cached parking data from localStorage
+  const loadFromCache = (): ParkingCachedData | null => {
+    if (typeof window === 'undefined') return null;
     try {
-      setLoading(true);
+      const cached = localStorage.getItem(PARKING_CACHE_KEY);
+      if (!cached) return null;
+      
+      const data: ParkingCachedData = JSON.parse(cached);
+      const hoursSinceCached = (Date.now() - data.cachedAt) / (1000 * 60 * 60);
+      
+      // Return null if cache is expired
+      if (hoursSinceCached > PARKING_CACHE_EXPIRY_HOURS) {
+        localStorage.removeItem(PARKING_CACHE_KEY);
+        return null;
+      }
+      
+      return data;
+    } catch {
+      return null;
+    }
+  };
+
+  // Save parking data to localStorage cache
+  const saveToCache = (spots: ParkingSpot[], properties: string[], lastUpdated: string) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const cacheData: ParkingCachedData = {
+        spots,
+        properties,
+        lastUpdated,
+        cachedAt: Date.now(),
+      };
+      localStorage.setItem(PARKING_CACHE_KEY, JSON.stringify(cacheData));
+    } catch (error) {
+      console.error('Failed to save parking cache:', error);
+    }
+  };
+
+  const fetchData = async (isBackground = false) => {
+    try {
+      if (!isBackground) {
+        setLoading(true);
+      } else {
+        setIsBackgroundRefresh(true);
+      }
       
       // Fetch parking data from Google Sheet API
       const parkingRes = await fetch('/api/parking');
@@ -123,6 +177,9 @@ export default function ParkingPage() {
         setSpots(parkingData.spots || []);
         setProperties(parkingData.properties || []);
         setLastUpdated(parkingData.lastUpdated);
+        
+        // Save to cache for next time
+        saveToCache(parkingData.spots || [], parkingData.properties || [], parkingData.lastUpdated);
       }
       
       // Fetch waitlist from Supabase
@@ -139,6 +196,7 @@ export default function ParkingPage() {
       console.error('Error fetching parking data:', err);
     } finally {
       setLoading(false);
+      setIsBackgroundRefresh(false);
     }
   };
 
@@ -174,7 +232,19 @@ export default function ParkingPage() {
 
   useEffect(() => {
     if (user) {
-      fetchData();
+      // Try to load from cache first for instant display
+      const cached = loadFromCache();
+      if (cached && cached.spots.length > 0) {
+        setSpots(cached.spots);
+        setProperties(cached.properties);
+        setLastUpdated(cached.lastUpdated);
+        setLoading(false);
+        // Fetch fresh data in background
+        fetchData(true);
+      } else {
+        // No cache, fetch normally
+        fetchData(false);
+      }
       
       const fetchUserName = async () => {
         if (user.user_metadata?.full_name) {
@@ -649,7 +719,7 @@ export default function ParkingPage() {
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
-                    <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+                    <Button variant="outline" size="sm" onClick={() => fetchData(false)} disabled={loading}>
                       <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
                   </div>
@@ -942,7 +1012,7 @@ export default function ParkingPage() {
                       Priority: 1st Spot → Indoor Upgrade → 2nd Spot (FIFO within each type)
                     </CardDescription>
                   </div>
-                  <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+                  <Button variant="outline" size="sm" onClick={() => fetchData(false)} disabled={loading}>
                     <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                   </Button>
                 </div>
@@ -1026,7 +1096,7 @@ export default function ParkingPage() {
                         <Download className="h-4 w-4 mr-1" />
                         Export
                       </Button>
-                      <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+                      <Button variant="outline" size="sm" onClick={() => fetchData(false)} disabled={loading}>
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                       </Button>
                     </div>
@@ -1460,7 +1530,7 @@ export default function ParkingPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+                    <Button variant="outline" size="sm" onClick={() => fetchData(false)} disabled={loading}>
                       <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
                   </div>
