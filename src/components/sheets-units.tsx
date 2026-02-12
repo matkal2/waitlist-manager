@@ -38,14 +38,66 @@ interface SheetsUnitsProps {
   onUnitsLoaded: (units: SheetUnit[]) => void;
 }
 
+const CACHE_KEY = 'cached_available_units';
+const CACHE_EXPIRY_HOURS = 24;
+
+interface CachedData {
+  units: SheetUnit[];
+  lastUpdated: string;
+  cachedAt: number;
+}
+
 export function SheetsUnits({ onUnitsLoaded }: SheetsUnitsProps) {
   const [units, setUnits] = useState<SheetUnit[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [propertyFilter, setPropertyFilter] = useState<string>('all');
+  const [isBackgroundRefresh, setIsBackgroundRefresh] = useState(false);
 
-  const fetchUnits = useCallback(async () => {
-    setLoading(true);
+  // Load cached data from localStorage
+  const loadFromCache = useCallback((): CachedData | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (!cached) return null;
+      
+      const data: CachedData = JSON.parse(cached);
+      const hoursSinceCached = (Date.now() - data.cachedAt) / (1000 * 60 * 60);
+      
+      // Return null if cache is expired
+      if (hoursSinceCached > CACHE_EXPIRY_HOURS) {
+        localStorage.removeItem(CACHE_KEY);
+        return null;
+      }
+      
+      return data;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Save data to localStorage cache
+  const saveToCache = useCallback((units: SheetUnit[], lastUpdated: string) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const cacheData: CachedData = {
+        units,
+        lastUpdated,
+        cachedAt: Date.now(),
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+    } catch (error) {
+      console.error('Failed to save cache:', error);
+    }
+  }, []);
+
+  const fetchUnits = useCallback(async (isBackground = false) => {
+    if (!isBackground) {
+      setLoading(true);
+    } else {
+      setIsBackgroundRefresh(true);
+    }
+    
     try {
       const response = await fetch('/api/sync-sheets');
       const data = await response.json();
@@ -54,6 +106,9 @@ export function SheetsUnits({ onUnitsLoaded }: SheetsUnitsProps) {
         setUnits(data.units);
         setLastUpdated(data.lastUpdated);
         onUnitsLoaded(data.units);
+        
+        // Save to cache for next time
+        saveToCache(data.units, data.lastUpdated);
         
         // Auto-check for matches and send notifications
         try {
@@ -81,15 +136,29 @@ export function SheetsUnits({ onUnitsLoaded }: SheetsUnitsProps) {
       console.error('Error fetching units:', error);
     } finally {
       setLoading(false);
+      setIsBackgroundRefresh(false);
     }
-  }, [onUnitsLoaded]);
+  }, [onUnitsLoaded, saveToCache]);
 
   useEffect(() => {
-    fetchUnits();
+    // Try to load from cache first for instant display
+    const cached = loadFromCache();
+    if (cached && cached.units.length > 0) {
+      setUnits(cached.units);
+      setLastUpdated(cached.lastUpdated);
+      onUnitsLoaded(cached.units);
+      setLoading(false);
+      // Fetch fresh data in background
+      fetchUnits(true);
+    } else {
+      // No cache, fetch normally
+      fetchUnits(false);
+    }
+    
     // Auto-refresh every 5 minutes
-    const interval = setInterval(fetchUnits, 5 * 60 * 1000);
+    const interval = setInterval(() => fetchUnits(true), 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [fetchUnits]);
+  }, [fetchUnits, loadFromCache, onUnitsLoaded]);
 
   const uniqueProperties = [...new Set(units.map(u => u.property))].sort();
 
@@ -115,7 +184,7 @@ export function SheetsUnits({ onUnitsLoaded }: SheetsUnitsProps) {
           <Button 
             size="sm" 
             variant="outline" 
-            onClick={fetchUnits}
+            onClick={() => fetchUnits(false)}
             disabled={loading}
           >
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
