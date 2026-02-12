@@ -374,6 +374,7 @@ export default function WaitlistPage() {
                   units={sheetUnits} 
                   waitlistEntries={entries}
                   onMatchCountChange={setMatchCount}
+                  onEntriesRefresh={fetchEntries}
                 />
               </CardContent>
             </Card>

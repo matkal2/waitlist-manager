@@ -26,6 +26,7 @@ interface SheetsMatchAlertsProps {
   units: SheetUnit[];
   waitlistEntries: WaitlistEntry[];
   onMatchCountChange?: (count: number) => void;
+  onEntriesRefresh?: () => void;
 }
 
 interface MatchedEntry extends WaitlistEntry {
@@ -38,7 +39,7 @@ interface Match {
   entries: MatchedEntry[];
 }
 
-export function SheetsMatchAlerts({ units, waitlistEntries, onMatchCountChange }: SheetsMatchAlertsProps) {
+export function SheetsMatchAlerts({ units, waitlistEntries, onMatchCountChange, onEntriesRefresh }: SheetsMatchAlertsProps) {
   const [sendingNotifications, setSendingNotifications] = useState<string[]>([]);
   
   // Track dismissed/archived alerts (persists permanently in localStorage)
@@ -74,6 +75,10 @@ export function SheetsMatchAlerts({ units, waitlistEntries, onMatchCountChange }
       console.error('Failed to reset outcome_status:', error);
     } else {
       console.log(`[Match Alert] Reset entry ${entryId} outcome to active`);
+      // Refresh entries in parent to reflect the change
+      if (onEntriesRefresh) {
+        onEntriesRefresh();
+      }
     }
   };
 
@@ -291,20 +296,24 @@ export function SheetsMatchAlerts({ units, waitlistEntries, onMatchCountChange }
       
       if (activeMatchEntryIds.length > 0) {
         // Update these entries to 'matched' if they're currently 'active' or null
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('waitlist_entries')
           .update({ outcome_status: 'matched' })
           .in('id', activeMatchEntryIds)
-          .in('outcome_status', ['active', null]);
+          .in('outcome_status', ['active', null])
+          .select();
         
         if (error) {
           console.error('Failed to sync matched outcomes:', error);
+        } else if (data && data.length > 0 && onEntriesRefresh) {
+          // Refresh entries in parent if we updated any
+          onEntriesRefresh();
         }
       }
     };
     
     syncMatchedOutcomes();
-  }, [matches]);
+  }, [matches, onEntriesRefresh]);
 
   if (matches.length === 0) {
     return (
