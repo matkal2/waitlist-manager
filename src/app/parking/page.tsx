@@ -613,17 +613,6 @@ export default function ParkingPage() {
               </div>
             </div>
           </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                <TrendingUp className="h-4 w-4 text-amber-600" />
-              </div>
-              <div>
-                <div className="text-xl font-bold text-amber-600">{avgWaitTime}d</div>
-                <div className="text-xs text-muted-foreground">Avg Wait</div>
-              </div>
-            </div>
-          </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={(tab) => {
