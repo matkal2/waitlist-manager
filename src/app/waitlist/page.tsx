@@ -55,7 +55,22 @@ export default function WaitlistPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userFullName, setUserFullName] = useState<string | null>(null);
-  const [matchCount, setMatchCount] = useState(0);
+  // Load cached match count for instant badge display
+  const [matchCount, setMatchCount] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('cached_match_count');
+      return cached ? parseInt(cached, 10) : 0;
+    }
+    return 0;
+  });
+
+  // Save match count to cache when it changes
+  const handleMatchCountChange = useCallback((count: number) => {
+    setMatchCount(count);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('cached_match_count', count.toString());
+    }
+  }, []);
 
   const fetchEntries = useCallback(async () => {
     try {
@@ -373,7 +388,7 @@ export default function WaitlistPage() {
                 <SheetsMatchAlerts 
                   units={sheetUnits} 
                   waitlistEntries={entries}
-                  onMatchCountChange={setMatchCount}
+                  onMatchCountChange={handleMatchCountChange}
                   onEntriesRefresh={fetchEntries}
                 />
               </CardContent>
