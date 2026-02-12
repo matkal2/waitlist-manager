@@ -600,8 +600,8 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
               </TableHead>
               <TableHead className="w-[110px]">Agent</TableHead>
               <TableHead className="w-[90px]">Contacted</TableHead>
-              <TableHead className="w-[100px]">Outcome</TableHead>
-              <TableHead className="w-[80px]">Actions</TableHead>
+              <TableHead className="w-[130px]">Outcome</TableHead>
+              <TableHead className="w-[90px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -692,14 +692,14 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                      <TableCell onClick={(e) => e.stopPropagation()} className="pr-4">
                         <OutcomeTracker 
                           entryId={entry.id} 
                           currentStatus={entry.outcome_status} 
                           onUpdate={onRefresh}
                         />
                       </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()} className="pl-0">
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-0">
                           <Button
                             variant="ghost"
