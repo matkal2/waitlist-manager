@@ -677,6 +677,16 @@ export default function ParkingPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {propertyFilter && propertyFilter !== 'all' && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setPropertyFilter('')}
+                        title="Back to all properties"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Select value={propertyFilter} onValueChange={setPropertyFilter}>
                       <SelectTrigger className="w-[220px]">
                         <SelectValue placeholder="Select a Property" />
