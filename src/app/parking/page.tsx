@@ -556,64 +556,66 @@ export default function ParkingPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        {/* Quick Stats Dashboard */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Car className="h-4 w-4 text-primary" />
+        {/* Quick Stats Dashboard - Only show when no specific property is selected */}
+        {(!propertyFilter || propertyFilter === 'all') && (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
+            <Card className="p-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Car className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <div className="text-xl font-bold">{stats.total}</div>
+                  <div className="text-xs text-muted-foreground">Total Spots</div>
+                </div>
               </div>
-              <div>
-                <div className="text-xl font-bold">{stats.total}</div>
-                <div className="text-xs text-muted-foreground">Total Spots</div>
+            </Card>
+            <Card className="p-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                </div>
+                <div>
+                  <div className="text-xl font-bold text-green-600">{stats.occupancyRate}%</div>
+                  <div className="text-xs text-muted-foreground">Occupancy</div>
+                </div>
               </div>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-                <CheckCircle className="h-4 w-4 text-green-600" />
+            </Card>
+            <Card className="p-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                  <ParkingCircle className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <div className="text-xl font-bold text-blue-600">{stats.vacant}</div>
+                  <div className="text-xs text-muted-foreground">Vacant</div>
+                </div>
               </div>
-              <div>
-                <div className="text-xl font-bold text-green-600">{stats.occupancyRate}%</div>
-                <div className="text-xs text-muted-foreground">Occupancy</div>
+            </Card>
+            <Card className="p-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                  <AlertTriangle className="h-4 w-4 text-orange-600" />
+                </div>
+                <div>
+                  <div className="text-xl font-bold text-orange-600">{stats.notice}</div>
+                  <div className="text-xs text-muted-foreground">On Notice</div>
+                </div>
               </div>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                <ParkingCircle className="h-4 w-4 text-blue-600" />
+            </Card>
+            <Card className="p-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                  <Users className="h-4 w-4 text-purple-600" />
+                </div>
+                <div>
+                  <div className="text-xl font-bold text-purple-600">{stats.waitlistTotal}</div>
+                  <div className="text-xs text-muted-foreground">On Waitlist</div>
+                </div>
               </div>
-              <div>
-                <div className="text-xl font-bold text-blue-600">{stats.vacant}</div>
-                <div className="text-xs text-muted-foreground">Vacant</div>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
-                <AlertTriangle className="h-4 w-4 text-orange-600" />
-              </div>
-              <div>
-                <div className="text-xl font-bold text-orange-600">{stats.notice}</div>
-                <div className="text-xs text-muted-foreground">On Notice</div>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-                <Users className="h-4 w-4 text-purple-600" />
-              </div>
-              <div>
-                <div className="text-xl font-bold text-purple-600">{stats.waitlistTotal}</div>
-                <div className="text-xs text-muted-foreground">On Waitlist</div>
-              </div>
-            </div>
-          </Card>
-        </div>
+            </Card>
+          </div>
+        )}
 
         <Tabs value={activeTab} onValueChange={(tab) => {
           setActiveTab(tab);
