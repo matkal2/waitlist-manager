@@ -835,10 +835,16 @@ export default function ParkingPage() {
                             </TableRow>
                           ) : (
                             filteredSpots.map((spot) => (
-                              <TableRow key={spot.id || spot.full_space_code}>
+                              <TableRow 
+                                key={spot.id || spot.full_space_code}
+                                className={spot.status === 'Vacant' ? 'bg-green-50' : ''}
+                              >
                                 <TableCell className="font-medium">{spot.full_space_code || spot.spot_number || '—'}</TableCell>
                                 <TableCell>
-                                  <Badge variant={spot.spot_type === 'Indoor' ? 'default' : 'outline'} className="text-xs">
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs ${spot.spot_type === 'Indoor' ? 'bg-white text-black border-gray-300' : ''}`}
+                                  >
                                     {spot.spot_type}
                                   </Badge>
                                 </TableCell>
@@ -846,11 +852,12 @@ export default function ParkingPage() {
                                   <Badge 
                                     variant={
                                       spot.status === 'Occupied' ? 'default' :
-                                      spot.status === 'Vacant' ? 'secondary' :
                                       spot.status === 'Notice' ? 'destructive' :
                                       'outline'
                                     }
-                                    className="text-xs"
+                                    className={`text-xs ${
+                                      spot.status === 'Vacant' ? 'bg-green-600 text-white border-green-600 hover:bg-green-700' : ''
+                                    }`}
                                   >
                                     {spot.status}
                                   </Badge>

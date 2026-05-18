@@ -158,11 +158,45 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
   const jsonStr = text.replace(/^[^(]*\(/, '').replace(/\);?$/, '');
   const data = JSON.parse(jsonStr);
   
-  const spots: ParkingSpot[] = [];
+  // Use a Map to merge multiple rows for the same spot (e.g., NOTICE + FUTURE rows)
+  const spotMap = new Map<string, ParkingSpot>();
+  // Track future tenant info separately to merge with Notice spots
+  const futureTenantsMap = new Map<string, { tenantCode: string; leaseStartDate: string }>();
   
   // Skip header rows (first 2 rows based on data structure)
   const rows = data.table.rows.slice(2);
   
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // First pass: collect all rows and identify future tenant assignments
+  for (const row of rows) {
+    const cells = row.c;
+    if (!cells || !cells[0]) continue;
+    
+    const type = cells[1]?.v || '';
+    if (type?.toString().toLowerCase() !== 'parking') continue;
+    
+    const fullSpaceCode = cells[4]?.v?.toString() || cells[4]?.f || '';
+    if (!fullSpaceCode) continue;
+    
+    const statusRaw = cells[17]?.v || 'CURRENT'; // Column R
+    const tenantCode = cells[20]?.v || null; // Column U
+    const leaseStartDateRaw = cells[22]?.v || null; // Column W
+    const leaseStartDate = parseGoogleDate(leaseStartDateRaw);
+    
+    const rawStatus = normalizeStatus(statusRaw);
+    
+    // If this row is marked as FUTURE status, or has a future lease start date, track it
+    if (rawStatus === 'Future' || (leaseStartDate && tenantCode && new Date(leaseStartDate) > today)) {
+      futureTenantsMap.set(fullSpaceCode, {
+        tenantCode: tenantCode || '',
+        leaseStartDate: leaseStartDate || ''
+      });
+    }
+  }
+  
+  // Second pass: build spot records and merge future tenant info
   for (const row of rows) {
     const cells = row.c;
     if (!cells || !cells[0]) continue;
@@ -181,6 +215,8 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
     
     const spotType = cells[2]?.v || 'Indoor'; // Indoor or Outdoor
     const fullSpaceCode = cells[4]?.v?.toString() || cells[4]?.f || '';
+    if (!fullSpaceCode) continue;
+    
     // Use formatted value (f) first to preserve leading zeros and letters like "02", "A1", fallback to raw value
     // Handle both numeric and alphanumeric spot numbers
     let spotNumber = '';
@@ -204,26 +240,83 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
     const leaseStartDateRaw = cells[22]?.v || null; // Column W
     const terminationDateRaw = cells[23]?.v || null; // Column X
     
+    // Future tenant columns (for NOTICE rows with incoming tenant)
+    const futureFlagCol24 = cells[24]?.v?.toString().toUpperCase() || ''; // Column Y - status (might have "FUTURE" or "NOTICE")
+    const futureTenantCodeCol26 = cells[26]?.v || null; // Column AA - future tenant code
+    const futureLeaseStartCol28 = cells[28]?.v || null; // Column AC - future lease start
+    const futureFlagCol30 = cells[30]?.v?.toString().toUpperCase() || ''; // Column AE - "FUTURE" indicator
+    
     const rawStatus = normalizeStatus(statusRaw);
     const terminationDate = parseGoogleDate(terminationDateRaw);
     const availableDate = parseGoogleDate(availableDateRaw);
     const leaseStartDate = parseGoogleDate(leaseStartDateRaw);
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const futureLeaseStartDate = parseGoogleDate(futureLeaseStartCol28);
     
     // Check if the current tenant's lease starts in the future
     const currentLeaseIsFuture = leaseStartDate && tenantCode && new Date(leaseStartDate) > today;
     
-    // Determine future tenant info - only when lease starts in the future
+    // Check if this row has inline future tenant data (NOTICE row with future assignment in same row)
+    const hasInlineFutureTenant = (futureFlagCol24 === 'FUTURE' || futureFlagCol30 === 'FUTURE') && futureTenantCodeCol26;
+    
+    // Skip FUTURE-status rows in the main spot list - we'll merge their data into existing spots
+    if (rawStatus === 'Future') {
+      // But if this spot doesn't exist yet (pure future assignment to vacant spot), create it
+      if (!spotMap.has(fullSpaceCode)) {
+        const futureEntry = tenantCode ? directoryMap.get(tenantCode) : null;
+        spotMap.set(fullSpaceCode, {
+          id: fullSpaceCode,
+          property,
+          spot_type: spotType,
+          spot_number: spotNumber,
+          full_space_code: fullSpaceCode,
+          monthly_rent: monthlyRent,
+          status: 'Vacant', // Currently vacant with future tenant
+          tenant_code: null,
+          tenant_name: null,
+          unit_number: null,
+          lease_start_date: null,
+          termination_date: null,
+          available_date: availableDate || new Date().toISOString().split('T')[0],
+          has_ev_charging: hasEvCharging,
+          is_handicap: isHandicap,
+          space_size: spaceSize,
+          future_tenant_code: tenantCode,
+          future_tenant_name: futureEntry?.residentName || (tenantCode ? `(${tenantCode})` : null),
+          future_unit_number: futureEntry?.unitNumber || null,
+          future_start_date: leaseStartDate,
+          has_future_tenant: true,
+        });
+      } else {
+        // Spot already exists (e.g., Notice row came first) - merge future tenant info
+        const existingSpot = spotMap.get(fullSpaceCode)!;
+        const futureEntry = tenantCode ? directoryMap.get(tenantCode) : null;
+        existingSpot.future_tenant_code = tenantCode;
+        existingSpot.future_tenant_name = futureEntry?.residentName || (tenantCode ? `(${tenantCode})` : null);
+        existingSpot.future_unit_number = futureEntry?.unitNumber || null;
+        existingSpot.future_start_date = leaseStartDate;
+        existingSpot.has_future_tenant = true;
+      }
+      continue;
+    }
+    
+    // Determine future tenant info - from inline columns or when lease starts in the future
     let futureTenantCode: string | null = null;
     let futureTenantName: string | null = null;
     let futureUnitNumber: string | null = null;
     let effectiveFutureStartDate: string | null = null;
     let hasFutureTenant = false;
     
-    // If current tenant's lease starts in the future, treat them as future tenant
-    if (currentLeaseIsFuture) {
+    // First check: inline future tenant data in same row (NOTICE rows with future assignment)
+    if (hasInlineFutureTenant) {
+      futureTenantCode = futureTenantCodeCol26;
+      const futureEntry = futureTenantCodeCol26 ? directoryMap.get(futureTenantCodeCol26) : null;
+      futureTenantName = futureEntry?.residentName || (futureTenantCodeCol26 ? `(${futureTenantCodeCol26})` : null);
+      futureUnitNumber = futureEntry?.unitNumber || null;
+      effectiveFutureStartDate = futureLeaseStartDate;
+      hasFutureTenant = true;
+    }
+    // Second check: current tenant's lease starts in the future
+    else if (currentLeaseIsFuture) {
       futureTenantCode = tenantCode;
       const futureEntry = tenantCode ? directoryMap.get(tenantCode) : null;
       // Fallback: show tenant code if not in Directory
@@ -254,7 +347,33 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
       effectiveAvailableDate = availableDate || new Date().toISOString().split('T')[0];
     }
     
-    spots.push({
+    // Check if there's a future tenant for this spot from a separate FUTURE row
+    const futureTenantFromMap = futureTenantsMap.get(fullSpaceCode);
+    if (futureTenantFromMap && !hasFutureTenant && futureTenantFromMap.tenantCode !== effectiveTenantCode) {
+      // There's a separate future tenant assignment for this spot
+      const futureEntry = directoryMap.get(futureTenantFromMap.tenantCode);
+      futureTenantCode = futureTenantFromMap.tenantCode;
+      futureTenantName = futureEntry?.residentName || (futureTenantFromMap.tenantCode ? `(${futureTenantFromMap.tenantCode})` : null);
+      futureUnitNumber = futureEntry?.unitNumber || null;
+      effectiveFutureStartDate = futureTenantFromMap.leaseStartDate;
+      hasFutureTenant = true;
+    }
+    
+    // If spot already exists in map (shouldn't happen often), merge or skip
+    if (spotMap.has(fullSpaceCode)) {
+      // Keep the non-Future record, but make sure future tenant info is preserved
+      const existingSpot = spotMap.get(fullSpaceCode)!;
+      if (hasFutureTenant && !existingSpot.has_future_tenant) {
+        existingSpot.future_tenant_code = futureTenantCode;
+        existingSpot.future_tenant_name = futureTenantName;
+        existingSpot.future_unit_number = futureUnitNumber;
+        existingSpot.future_start_date = effectiveFutureStartDate;
+        existingSpot.has_future_tenant = true;
+      }
+      continue;
+    }
+    
+    spotMap.set(fullSpaceCode, {
       id: fullSpaceCode,
       property,
       spot_type: spotType,
@@ -279,7 +398,7 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
     });
   }
   
-  return spots;
+  return Array.from(spotMap.values());
 }
 
 export async function GET() {
