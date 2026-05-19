@@ -765,7 +765,7 @@ export default function ParkingPage() {
                           >
                             <div className="font-medium text-sm">{p}</div>
                             <div className="text-xs text-muted-foreground mt-1">
-                              {propSpots.length} spots • {vacant} vacant{notice > 0 && <span className="text-orange-500"> • {notice} notice</span>}
+                              {propSpots.length} spots • <span className="text-green-600">{vacant} vacant</span>{notice > 0 && <span className="text-red-500"> • {notice} notice</span>}
                             </div>
                           </button>
                         );
