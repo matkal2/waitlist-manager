@@ -910,8 +910,17 @@ export default function ParkingPage() {
                                           )}
                                         </div>
                                         <span className="text-muted-foreground text-xs">{spot.tenant_code}</span>
+                                        {/* Show reserved applicant info for Notice spots with reservation */}
+                                        {spot.status === 'Notice' && spot.reserved_for_applicant && (
+                                          <div className="mt-1 flex items-center gap-1">
+                                            <span className="text-amber-700 text-xs font-medium">→ {spot.reserved_for_applicant}</span>
+                                            <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-50 text-amber-600 border-amber-300">
+                                              Reserved
+                                            </Badge>
+                                          </div>
+                                        )}
                                       </div>
-                                      {spot.status === 'Notice' && !spot.has_future_tenant && (
+                                      {spot.status === 'Notice' && !spot.has_future_tenant && !spot.reserved_for_applicant && (
                                         <Button
                                           variant="outline"
                                           size="sm"

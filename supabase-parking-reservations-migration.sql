@@ -35,12 +35,13 @@ CREATE TABLE IF NOT EXISTS parking_reservations (
   
   -- Metadata
   reserved_by TEXT,
-  notes TEXT,
-  
-  -- Ensure one active reservation per spot
-  CONSTRAINT unique_active_spot_reservation UNIQUE (full_space_code, status) 
-    WHERE status = 'active'
+  notes TEXT
 );
+
+-- Partial unique index to ensure one active reservation per spot
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_active_spot_reservation 
+  ON parking_reservations (full_space_code) 
+  WHERE status = 'active';
 
 -- Index for quick lookups
 CREATE INDEX IF NOT EXISTS idx_parking_reservations_property ON parking_reservations(property);

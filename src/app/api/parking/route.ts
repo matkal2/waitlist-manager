@@ -454,16 +454,22 @@ export async function GET() {
     const reservations = await fetchReservations();
     const reservationMap = new Map(reservations.map(r => [r.full_space_code, r]));
     
-    // Apply reservations to spots - if a vacant spot has a reservation, mark it as Reserved
+    // Apply reservations to spots
     for (const spot of spots) {
       const reservation = reservationMap.get(spot.full_space_code);
-      if (reservation && spot.status === 'Vacant') {
-        spot.status = 'Reserved';
-        spot.reservation_id = reservation.id;
-        spot.reserved_for_applicant = reservation.applicant_name;
-        spot.reserved_for_unit = reservation.unit_number;
-        spot.reservation_date = reservation.reservation_date;
-        spot.expected_move_in = reservation.expected_move_in;
+      if (reservation) {
+        // For Vacant spots: change status to Reserved
+        if (spot.status === 'Vacant') {
+          spot.status = 'Reserved';
+        }
+        // For both Vacant and Notice spots: add reservation info
+        if (spot.status === 'Reserved' || spot.status === 'Notice') {
+          spot.reservation_id = reservation.id;
+          spot.reserved_for_applicant = reservation.applicant_name;
+          spot.reserved_for_unit = reservation.unit_number;
+          spot.reservation_date = reservation.reservation_date;
+          spot.expected_move_in = reservation.expected_move_in;
+        }
       }
     }
     
