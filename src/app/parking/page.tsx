@@ -20,7 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Car, ArrowLeft, User, Key, Shield, LogOut, ParkingCircle, CheckCircle, AlertTriangle, History, Users, Search, Zap, Accessibility, RefreshCw, Download, FileText, Calendar, Undo2, BarChart3, TrendingUp, Target, Building2 } from 'lucide-react';
+import { Car, ArrowLeft, User, Key, Shield, LogOut, ParkingCircle, CheckCircle, AlertTriangle, History, Users, Search, Zap, Accessibility, RefreshCw, Download, FileText, Calendar, Undo2, BarChart3, TrendingUp, Target, Building2, Pencil } from 'lucide-react';
 import { ParkingChangeForm } from '@/components/parking-change-form';
 import { ParkingReserveForm } from '@/components/parking-reserve-form';
 import { ParkingReservationMatches } from '@/components/parking-reservation-matches';
@@ -1092,40 +1092,65 @@ export default function ParkingPage() {
                       
                       return (
                         <div className="mt-6 p-4 rounded-lg border bg-amber-50 dark:bg-amber-900/10">
-                          <div className="flex items-center gap-2 mb-3">
-                            <Users className="h-5 w-5 text-amber-600" />
-                            <h3 className="font-semibold text-amber-800 dark:text-amber-200">
-                              Waitlist for {propertyFilter} ({propertyWaitlist.length})
-                            </h3>
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-5 w-5 text-amber-600" />
+                              <h3 className="font-semibold text-amber-800 dark:text-amber-200">
+                                Waitlist for {propertyFilter} ({propertyWaitlist.length})
+                              </h3>
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="text-amber-700 border-amber-300 hover:bg-amber-100"
+                              onClick={() => setActiveTab('waitlist')}
+                            >
+                              <Pencil className="h-3 w-3 mr-1" />
+                              Edit Waitlist
+                            </Button>
                           </div>
-                          <div className="space-y-2">
-                            {propertyWaitlist
-                              .sort((a, b) => {
-                                const priority: Record<string, number> = { '1st Spot': 1, 'Indoor Upgrade': 2, '2nd Spot': 3 };
-                                const pA = priority[a.waitlist_type] || 3;
-                                const pB = priority[b.waitlist_type] || 3;
-                                if (pA !== pB) return pA - pB;
-                                return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-                              })
-                              .map((entry, idx) => (
-                                <div key={entry.id} className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded border text-sm">
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-muted-foreground w-5">{idx + 1}.</span>
-                                    <span className="font-medium">{entry.tenant_name}</span>
-                                    <span className="text-muted-foreground">Unit {entry.unit_number}</span>
-                                  </div>
-                                  <Badge 
-                                    className={`text-white ${
-                                      entry.waitlist_type === '1st Spot' ? 'bg-purple-500' :
-                                      entry.waitlist_type === 'Indoor Upgrade' ? 'bg-teal-500' :
-                                      'bg-indigo-400'
-                                    }`}
-                                  >
-                                    {entry.waitlist_type}
-                                  </Badge>
-                                </div>
-                              ))}
-                          </div>
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-amber-100/50">
+                                <TableHead className="w-8">#</TableHead>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Unit</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead>Date Added</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {propertyWaitlist
+                                .sort((a, b) => {
+                                  const priority: Record<string, number> = { '1st Spot': 1, 'Indoor Upgrade': 2, '2nd Spot': 3 };
+                                  const pA = priority[a.waitlist_type] || 3;
+                                  const pB = priority[b.waitlist_type] || 3;
+                                  if (pA !== pB) return pA - pB;
+                                  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+                                })
+                                .map((entry, idx) => (
+                                  <TableRow key={entry.id} className="bg-white dark:bg-gray-800">
+                                    <TableCell className="text-muted-foreground font-medium">{idx + 1}</TableCell>
+                                    <TableCell className="font-medium">{entry.tenant_name}</TableCell>
+                                    <TableCell>{entry.unit_number}</TableCell>
+                                    <TableCell>
+                                      <Badge 
+                                        className={`text-white ${
+                                          entry.waitlist_type === '1st Spot' ? 'bg-purple-500' :
+                                          entry.waitlist_type === 'Indoor Upgrade' ? 'bg-teal-500' :
+                                          'bg-indigo-400'
+                                        }`}
+                                      >
+                                        {entry.waitlist_type}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground">
+                                      {new Date(entry.created_at).toLocaleDateString()}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                            </TableBody>
+                          </Table>
                         </div>
                       );
                     })()}
