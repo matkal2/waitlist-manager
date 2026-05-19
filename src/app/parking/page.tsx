@@ -22,6 +22,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Car, ArrowLeft, User, Key, Shield, LogOut, ParkingCircle, CheckCircle, AlertTriangle, History, Users, Search, Zap, Accessibility, RefreshCw, Download, FileText, Calendar, Undo2, BarChart3, TrendingUp, Target, Building2 } from 'lucide-react';
 import { ParkingChangeForm } from '@/components/parking-change-form';
+import { ParkingReserveForm } from '@/components/parking-reserve-form';
+import { ParkingReservationMatches } from '@/components/parking-reservation-matches';
 import { ParkingWaitlistTable } from '@/components/parking-waitlist-table';
 import { exportParkingToPDF } from '@/lib/pdf-export';
 
@@ -48,6 +50,12 @@ interface ParkingSpot {
   future_unit_number: string | null;
   future_start_date: string | null;
   has_future_tenant: boolean;
+  // Reservation info
+  reservation_id: string | null;
+  reserved_for_applicant: string | null;
+  reserved_for_unit: string | null;
+  reservation_date: string | null;
+  expected_move_in: string | null;
 }
 
 interface ParkingChange {
@@ -109,6 +117,10 @@ export default function ParkingPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  
+  // Reserve spot dialog
+  const [showReserveForm, setShowReserveForm] = useState(false);
+  const [spotToReserve, setSpotToReserve] = useState<ParkingSpot | null>(null);
   
   // Historical trends
   const [snapshotsCaptured, setSnapshotsCaptured] = useState(false);
@@ -665,6 +677,9 @@ export default function ParkingPage() {
           </TabsList>
 
           <TabsContent value="inventory">
+            {/* Reservation matches alert */}
+            <ParkingReservationMatches onConvertSuccess={() => fetchData(false)} />
+            
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -849,7 +864,10 @@ export default function ParkingPage() {
                             filteredSpots.map((spot) => (
                               <TableRow 
                                 key={spot.id || spot.full_space_code}
-                                className={spot.status === 'Vacant' ? 'bg-green-50' : ''}
+                                className={
+                                  spot.status === 'Vacant' ? 'bg-green-50' : 
+                                  spot.status === 'Reserved' ? 'bg-amber-50' : ''
+                                }
                               >
                                 <TableCell className="font-medium">{spot.full_space_code || spot.spot_number || '—'}</TableCell>
                                 <TableCell>
@@ -868,7 +886,8 @@ export default function ParkingPage() {
                                       'outline'
                                     }
                                     className={`text-xs ${
-                                      spot.status === 'Vacant' ? 'bg-green-600 text-white border-green-600 hover:bg-green-700' : ''
+                                      spot.status === 'Vacant' ? 'bg-green-600 text-white border-green-600 hover:bg-green-700' : 
+                                      spot.status === 'Reserved' ? 'bg-amber-600 text-white border-amber-600 hover:bg-amber-700' : ''
                                     }`}
                                   >
                                     {spot.status}
@@ -891,6 +910,29 @@ export default function ParkingPage() {
                                       </div>
                                       <span className="text-muted-foreground text-xs">{spot.tenant_code}</span>
                                     </div>
+                                  ) : spot.status === 'Reserved' && spot.reserved_for_applicant ? (
+                                    <div>
+                                      <div className="flex items-center gap-1">
+                                        <span className="font-medium text-amber-700">{spot.reserved_for_applicant}</span>
+                                        <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-50 text-amber-600 border-amber-300">
+                                          Applicant
+                                        </Badge>
+                                      </div>
+                                      <span className="text-muted-foreground text-xs">Unit {spot.reserved_for_unit}</span>
+                                    </div>
+                                  ) : spot.status === 'Vacant' ? (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 text-xs text-amber-600 border-amber-300 hover:bg-amber-50"
+                                      onClick={() => {
+                                        setSpotToReserve(spot);
+                                        setShowReserveForm(true);
+                                      }}
+                                    >
+                                      <Calendar className="h-3 w-3 mr-1" />
+                                      Reserve
+                                    </Button>
                                   ) : (
                                     <span className="text-muted-foreground">—</span>
                                   )}
@@ -1900,6 +1942,14 @@ export default function ParkingPage() {
           Parking Manager • Property Management Hub
         </div>
       </footer>
+
+      {/* Reserve Spot Dialog */}
+      <ParkingReserveForm
+        spot={spotToReserve}
+        open={showReserveForm}
+        onOpenChange={setShowReserveForm}
+        onSuccess={() => fetchData(false)}
+      />
     </div>
   );
 }

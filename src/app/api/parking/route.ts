@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { ParkingReservation } from '@/types/database';
 
 const PARKING_SPREADSHEET_ID = '1w78XH8yuyuoZm_l1PtHIFzXygwEjS56lV0rZwEQvNwM';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 interface ParkingSpot {
   id: string;
@@ -25,6 +32,12 @@ interface ParkingSpot {
   future_unit_number: string | null;
   future_start_date: string | null;
   has_future_tenant: boolean;
+  // Reservation info (for applicants in screening)
+  reservation_id: string | null;
+  reserved_for_applicant: string | null;
+  reserved_for_unit: string | null;
+  reservation_date: string | null;
+  expected_move_in: string | null;
 }
 
 interface DirectoryEntry {
@@ -285,6 +298,11 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
           future_unit_number: futureEntry?.unitNumber || null,
           future_start_date: leaseStartDate,
           has_future_tenant: true,
+          reservation_id: null,
+          reserved_for_applicant: null,
+          reserved_for_unit: null,
+          reservation_date: null,
+          expected_move_in: null,
         });
       } else {
         // Spot already exists (e.g., Notice row came first) - merge future tenant info
@@ -395,10 +413,35 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
       future_unit_number: futureUnitNumber,
       future_start_date: effectiveFutureStartDate,
       has_future_tenant: hasFutureTenant,
+      reservation_id: null,
+      reserved_for_applicant: null,
+      reserved_for_unit: null,
+      reservation_date: null,
+      expected_move_in: null,
     });
   }
   
   return Array.from(spotMap.values());
+}
+
+// Fetch active reservations from Supabase
+async function fetchReservations(): Promise<ParkingReservation[]> {
+  try {
+    const { data, error } = await supabase
+      .from('parking_reservations')
+      .select('*')
+      .eq('status', 'active');
+    
+    if (error) {
+      console.error('Error fetching reservations:', error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error in fetchReservations:', error);
+    return [];
+  }
 }
 
 export async function GET() {
@@ -406,6 +449,23 @@ export async function GET() {
     // Fetch directory first for tenant name lookups
     const directoryMap = await fetchDirectory();
     const spots = await fetchParkingSpots(directoryMap);
+    
+    // Fetch active reservations and merge with spots
+    const reservations = await fetchReservations();
+    const reservationMap = new Map(reservations.map(r => [r.full_space_code, r]));
+    
+    // Apply reservations to spots - if a vacant spot has a reservation, mark it as Reserved
+    for (const spot of spots) {
+      const reservation = reservationMap.get(spot.full_space_code);
+      if (reservation && spot.status === 'Vacant') {
+        spot.status = 'Reserved';
+        spot.reservation_id = reservation.id;
+        spot.reserved_for_applicant = reservation.applicant_name;
+        spot.reserved_for_unit = reservation.unit_number;
+        spot.reservation_date = reservation.reservation_date;
+        spot.expected_move_in = reservation.expected_move_in;
+      }
+    }
     
     // Calculate stats
     const totalSpots = spots.length;

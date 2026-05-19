@@ -144,6 +144,43 @@ export interface ParkingNotification {
   sent_to_agent: string | null;
 }
 
+export type ParkingReservationStatus = 'active' | 'converted' | 'cancelled' | 'expired';
+
+export interface ParkingReservation {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  
+  // Spot information
+  property: string;
+  spot_number: string;
+  full_space_code: string;
+  spot_type: string;
+  monthly_rent: number;
+  
+  // Applicant information
+  applicant_name: string;
+  unit_number: string;
+  email: string | null;
+  phone: string | null;
+  
+  // Reservation details
+  expected_move_in: string | null;
+  reservation_date: string;
+  expiration_date: string | null;
+  
+  // Status tracking
+  status: ParkingReservationStatus;
+  
+  // Conversion tracking
+  converted_at: string | null;
+  converted_tenant_code: string | null;
+  
+  // Metadata
+  reserved_by: string | null;
+  notes: string | null;
+}
+
 // =============================================================================
 // DATABASE SCHEMA
 // =============================================================================
@@ -185,6 +222,11 @@ export interface Database {
         Row: ParkingNotification;
         Insert: Omit<ParkingNotification, 'id' | 'created_at'>;
         Update: Partial<Omit<ParkingNotification, 'id' | 'created_at'>>;
+      };
+      parking_reservations: {
+        Row: ParkingReservation;
+        Insert: Omit<ParkingReservation, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<ParkingReservation, 'id' | 'created_at' | 'updated_at'>>;
       };
     };
   };
