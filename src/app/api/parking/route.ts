@@ -455,9 +455,12 @@ export async function GET() {
     const reservationMap = new Map(reservations.map(r => [r.full_space_code, r]));
     
     // Apply reservations to spots
+    console.log('Active reservations:', reservations.map(r => ({ full_space_code: r.full_space_code, applicant: r.applicant_name })));
+    
     for (const spot of spots) {
       const reservation = reservationMap.get(spot.full_space_code);
       if (reservation) {
+        console.log(`Match found: spot ${spot.full_space_code} -> reservation for ${reservation.applicant_name}`);
         // For Vacant spots: change status to Reserved
         if (spot.status === 'Vacant') {
           spot.status = 'Reserved';
@@ -472,6 +475,10 @@ export async function GET() {
         }
       }
     }
+    
+    // Log sample spots for Countryside C for debugging
+    const countrysideSpots = spots.filter(s => s.property.includes('Countryside C'));
+    console.log('Countryside C spots sample:', countrysideSpots.slice(0, 5).map(s => s.full_space_code));
     
     // Calculate stats
     const totalSpots = spots.length;
