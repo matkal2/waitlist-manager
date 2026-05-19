@@ -217,6 +217,8 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
           return spot.status === 'Occupied' || spot.status === 'Notice' || spot.status === 'Future';
         } else if (changeType === 'Add' || changeType === 'New Lease Signed') {
           // Add/New Lease: Show Vacant + Notice spots that are available by effective date
+          // Exclude Reserved spots - they are held for applicants in screening
+          if (spot.status === 'Reserved') return false;
           if (spot.status !== 'Vacant' && spot.status !== 'Notice') return false;
           return isSpotAvailableByDate(spot);
         } else if (changeType === 'Transfer') {
@@ -245,6 +247,8 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
     return spots
       .filter(spot => {
         if (spot.property !== selectedProperty) return false;
+        // Exclude Reserved spots - they are held for applicants in screening
+        if (spot.status === 'Reserved') return false;
         // Show Vacant and Notice spots that are available by effective date
         if (spot.status !== 'Vacant' && spot.status !== 'Notice') return false;
         return isSpotAvailableByDate(spot);
