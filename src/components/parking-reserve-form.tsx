@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Calendar, User, Home, Mail, Phone } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Calendar, User, Home } from 'lucide-react';
 
 interface ParkingSpot {
   id: string;
@@ -36,14 +43,44 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  const [units, setUnits] = useState<string[]>([]);
+  const [loadingUnits, setLoadingUnits] = useState(false);
+  
   const [formData, setFormData] = useState({
     applicant_name: '',
     unit_number: '',
-    email: '',
-    phone: '',
     expected_move_in: '',
     notes: '',
   });
+
+  // Fetch units for the property when dialog opens
+  useEffect(() => {
+    if (open && spot?.property) {
+      setLoadingUnits(true);
+      fetch(`/api/directory?property=${encodeURIComponent(spot.property)}`)
+        .then(res => res.json())
+        .then(data => {
+          // Extract unique unit numbers from directory
+          const unitSet = new Set<string>();
+          if (data.entries) {
+            data.entries.forEach((entry: { unit_number?: string }) => {
+              if (entry.unit_number) {
+                unitSet.add(entry.unit_number);
+              }
+            });
+          }
+          // Sort units naturally (1, 2, 10 instead of 1, 10, 2)
+          const sortedUnits = Array.from(unitSet).sort((a, b) => {
+            const numA = parseInt(a.replace(/\D/g, '')) || 0;
+            const numB = parseInt(b.replace(/\D/g, '')) || 0;
+            return numA - numB;
+          });
+          setUnits(sortedUnits);
+        })
+        .catch(() => setUnits([]))
+        .finally(() => setLoadingUnits(false));
+    }
+  }, [open, spot?.property]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,8 +101,6 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
           monthly_rent: spot.monthly_rent,
           applicant_name: formData.applicant_name,
           unit_number: formData.unit_number,
-          email: formData.email || null,
-          phone: formData.phone || null,
           expected_move_in: formData.expected_move_in || null,
           notes: formData.notes || null,
         }),
@@ -81,8 +116,6 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
       setFormData({
         applicant_name: '',
         unit_number: '',
-        email: '',
-        phone: '',
         expected_move_in: '',
         notes: '',
       });
@@ -100,8 +133,6 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
     setFormData({
       applicant_name: '',
       unit_number: '',
-      email: '',
-      phone: '',
       expected_move_in: '',
       notes: '',
     });
@@ -151,56 +182,36 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
                 <Home className="h-3 w-3" />
                 Unit Number *
               </Label>
-              <Input
-                id="unit_number"
+              <Select
                 value={formData.unit_number}
-                onChange={(e) => setFormData({ ...formData, unit_number: e.target.value })}
-                placeholder="204"
+                onValueChange={(value) => setFormData({ ...formData, unit_number: value })}
                 required
-              />
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="flex items-center gap-1">
-                <Mail className="h-3 w-3" />
-                Email
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="john@example.com"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="phone" className="flex items-center gap-1">
-                <Phone className="h-3 w-3" />
-                Phone
-              </Label>
-              <Input
-                id="phone"
-                type="tel"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="(555) 123-4567"
-              />
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingUnits ? "Loading units..." : "Select unit"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {units.map((unit) => (
+                    <SelectItem key={unit} value={unit}>
+                      {unit}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           
           <div className="space-y-2">
             <Label htmlFor="expected_move_in" className="flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              Expected Move-In Date
+              Expected Move-In Date *
             </Label>
             <Input
               id="expected_move_in"
               type="date"
               value={formData.expected_move_in}
               onChange={(e) => setFormData({ ...formData, expected_move_in: e.target.value })}
+              required
             />
           </div>
           
