@@ -53,25 +53,38 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
     notes: '',
   });
 
-  // Fetch units for the property when dialog opens
+  // Fetch units for the property when dialog opens - combine parking + directory sources
   useEffect(() => {
     if (open && spot?.property) {
       setLoadingUnits(true);
-      // Fetch units from parking data for this property
-      fetch('/api/parking')
-        .then(res => res.json())
-        .then(data => {
-          // Extract unique unit numbers from parking spots for THIS property only
+      const spotPropertyLower = spot.property.toLowerCase();
+      
+      // Fetch from both parking and directory APIs to get complete unit list
+      Promise.all([
+        fetch('/api/parking').then(res => res.json()),
+        fetch('/api/directory').then(res => res.json())
+      ])
+        .then(([parkingData, directoryData]) => {
           const unitSet = new Set<string>();
-          const spotPropertyLower = spot.property.toLowerCase();
-          if (data.spots) {
-            data.spots.forEach((s: { unit_number?: string; property?: string }) => {
-              // Filter by property (case-insensitive) and extract unit numbers
+          
+          // Get units from parking spots for this property
+          if (parkingData.spots) {
+            parkingData.spots.forEach((s: { unit_number?: string; property?: string }) => {
               if (s.unit_number && s.property?.toLowerCase() === spotPropertyLower) {
                 unitSet.add(s.unit_number);
               }
             });
           }
+          
+          // Also get units from directory for this property (catches units without parking)
+          if (directoryData.directory) {
+            directoryData.directory.forEach((entry: { unitNumber?: string; property?: string }) => {
+              if (entry.unitNumber && entry.property?.toLowerCase() === spotPropertyLower) {
+                unitSet.add(entry.unitNumber);
+              }
+            });
+          }
+          
           // Sort units naturally (1, 2, 10 instead of 1, 10, 2)
           const sortedUnits = Array.from(unitSet).sort((a, b) => {
             const numA = parseInt(a.replace(/\D/g, '')) || 0;
