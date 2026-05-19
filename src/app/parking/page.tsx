@@ -899,16 +899,32 @@ export default function ParkingPage() {
                                 </TableCell>
                                 <TableCell className="text-sm">
                                   {spot.tenant_code ? (
-                                    <div>
-                                      <div className="flex items-center gap-1">
-                                        {spot.tenant_name && <span className="font-medium">{spot.tenant_name}</span>}
-                                        {spot.status === 'Notice' && (
-                                          <Badge variant="outline" className="text-[10px] px-1 py-0 bg-orange-50 text-orange-600 border-orange-300">
-                                            Leaving
-                                          </Badge>
-                                        )}
+                                    <div className="flex items-center gap-2">
+                                      <div>
+                                        <div className="flex items-center gap-1">
+                                          {spot.tenant_name && <span className="font-medium">{spot.tenant_name}</span>}
+                                          {spot.status === 'Notice' && (
+                                            <Badge variant="outline" className="text-[10px] px-1 py-0 bg-orange-50 text-orange-600 border-orange-300">
+                                              Leaving
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        <span className="text-muted-foreground text-xs">{spot.tenant_code}</span>
                                       </div>
-                                      <span className="text-muted-foreground text-xs">{spot.tenant_code}</span>
+                                      {spot.status === 'Notice' && !spot.has_future_tenant && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-6 text-xs text-amber-600 border-amber-300 hover:bg-amber-50 ml-auto"
+                                          onClick={() => {
+                                            setSpotToReserve(spot);
+                                            setShowReserveForm(true);
+                                          }}
+                                        >
+                                          <Calendar className="h-3 w-3 mr-1" />
+                                          Reserve
+                                        </Button>
+                                      )}
                                     </div>
                                   ) : spot.status === 'Reserved' && spot.reserved_for_applicant ? (
                                     <div>
@@ -920,7 +936,7 @@ export default function ParkingPage() {
                                       </div>
                                       <span className="text-muted-foreground text-xs">Unit {spot.reserved_for_unit}</span>
                                     </div>
-                                  ) : (spot.status === 'Vacant' || spot.status === 'Notice') && !spot.has_future_tenant ? (
+                                  ) : spot.status === 'Vacant' && !spot.has_future_tenant ? (
                                     <Button
                                       variant="outline"
                                       size="sm"
