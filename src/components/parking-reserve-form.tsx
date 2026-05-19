@@ -57,15 +57,16 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
   useEffect(() => {
     if (open && spot?.property) {
       setLoadingUnits(true);
-      fetch(`/api/directory?property=${encodeURIComponent(spot.property)}`)
+      fetch('/api/directory')
         .then(res => res.json())
         .then(data => {
-          // Extract unique unit numbers from directory
+          // Extract unique unit numbers from directory for this property
           const unitSet = new Set<string>();
-          if (data.entries) {
-            data.entries.forEach((entry: { unit_number?: string }) => {
-              if (entry.unit_number) {
-                unitSet.add(entry.unit_number);
+          if (data.directory) {
+            data.directory.forEach((entry: { unitNumber?: string; property?: string }) => {
+              // Filter by property and extract unit numbers
+              if (entry.unitNumber && entry.property === spot.property) {
+                unitSet.add(entry.unitNumber);
               }
             });
           }
