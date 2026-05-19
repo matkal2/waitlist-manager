@@ -198,22 +198,40 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
                 <Home className="h-3 w-3" />
                 Unit Number *
               </Label>
-              <Select
-                value={formData.unit_number}
-                onValueChange={(value) => setFormData({ ...formData, unit_number: value })}
-                required
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={loadingUnits ? "Loading units..." : "Select unit"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {units.map((unit) => (
-                    <SelectItem key={unit} value={unit}>
-                      {unit}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {units.length > 0 ? (
+                <div className="space-y-2">
+                  <Select
+                    value={formData.unit_number}
+                    onValueChange={(value) => setFormData({ ...formData, unit_number: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={loadingUnits ? "Loading..." : "Select unit"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {units.map((unit) => (
+                        <SelectItem key={unit} value={unit}>
+                          {unit}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    id="unit_number_manual"
+                    value={formData.unit_number}
+                    onChange={(e) => setFormData({ ...formData, unit_number: e.target.value })}
+                    placeholder="Or type unit number"
+                    className="text-sm"
+                  />
+                </div>
+              ) : (
+                <Input
+                  id="unit_number"
+                  value={formData.unit_number}
+                  onChange={(e) => setFormData({ ...formData, unit_number: e.target.value })}
+                  placeholder={loadingUnits ? "Loading..." : "Enter unit number"}
+                  required
+                />
+              )}
             </div>
           </div>
           
