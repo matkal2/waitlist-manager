@@ -113,6 +113,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     
+    // Log to activity log (parking_changes table)
+    await supabase.from('parking_changes').insert({
+      type: 'Reserve',
+      tenant_name: applicant_name,
+      tenant_unit: `${property} - ${unit_number}`,
+      effective_date: expected_move_in || new Date().toISOString().split('T')[0],
+      primary_space: full_space_code,
+      submitter: reserved_by || 'System',
+      other_notes: `Reserved spot ${full_space_code} for ${applicant_name} (Unit ${unit_number})`,
+      submission_date: new Date().toISOString(),
+      synced_to_sheet: false,
+      reverted: false,
+    });
+    
     return NextResponse.json({ reservation: data }, { status: 201 });
   } catch (error) {
     console.error('Error in POST /api/parking/reservations:', error);
@@ -159,10 +173,18 @@ export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const cancelled_by = searchParams.get('cancelled_by');
     
     if (!id) {
       return NextResponse.json({ error: 'Reservation ID is required' }, { status: 400 });
     }
+    
+    // First fetch the reservation to get details for activity log
+    const { data: existingReservation } = await supabase
+      .from('parking_reservations')
+      .select('*')
+      .eq('id', id)
+      .single();
     
     const { data, error } = await supabase
       .from('parking_reservations')
@@ -174,6 +196,22 @@ export async function DELETE(request: Request) {
     if (error) {
       console.error('Error cancelling reservation:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    
+    // Log to activity log (parking_changes table)
+    if (existingReservation) {
+      await supabase.from('parking_changes').insert({
+        type: 'Cancel Reservation',
+        tenant_name: existingReservation.applicant_name,
+        tenant_unit: `${existingReservation.property} - ${existingReservation.unit_number}`,
+        effective_date: new Date().toISOString().split('T')[0],
+        primary_space: existingReservation.full_space_code,
+        submitter: cancelled_by || 'System',
+        other_notes: `Cancelled reservation for ${existingReservation.applicant_name} on spot ${existingReservation.full_space_code}`,
+        submission_date: new Date().toISOString(),
+        synced_to_sheet: false,
+        reverted: false,
+      });
     }
     
     return NextResponse.json({ reservation: data });

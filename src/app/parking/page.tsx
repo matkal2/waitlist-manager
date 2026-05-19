@@ -219,7 +219,8 @@ export default function ParkingPage() {
     
     setCancellingReservation(reservationId);
     try {
-      const response = await fetch(`/api/parking/reservations?id=${reservationId}`, {
+      const cancelledBy = user?.email || 'Unknown';
+      const response = await fetch(`/api/parking/reservations?id=${reservationId}&cancelled_by=${encodeURIComponent(cancelledBy)}`, {
         method: 'DELETE',
       });
       
