@@ -828,18 +828,6 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
             </div>
           )}
 
-          {/* Other Notes */}
-          <div>
-            <Label htmlFor="otherNotes">Other Notes <span className="text-xs text-muted-foreground">(optional)</span></Label>
-            <textarea
-              id="otherNotes"
-              value={otherNotes}
-              onChange={(e) => setOtherNotes(e.target.value)}
-              className="w-full min-h-[80px] px-3 py-2 border rounded-md text-sm"
-              placeholder="Any additional notes..."
-            />
-          </div>
-
           {/* Submitter (auto-filled, read-only) */}
           <div className="grid grid-cols-2 gap-4">
             <div>
