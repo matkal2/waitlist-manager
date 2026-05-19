@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Calendar, User, Home } from 'lucide-react';
+import { PROPERTY_UNITS } from '@/lib/property-units';
 
 interface ParkingSpot {
   id: string;
@@ -43,9 +44,6 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const [units, setUnits] = useState<string[]>([]);
-  const [loadingUnits, setLoadingUnits] = useState(false);
-  
   const [formData, setFormData] = useState({
     applicant_name: '',
     unit_number: '',
@@ -53,50 +51,8 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
     notes: '',
   });
 
-  // Fetch units for the property when dialog opens - combine parking + directory sources
-  useEffect(() => {
-    if (open && spot?.property) {
-      setLoadingUnits(true);
-      const spotPropertyLower = spot.property.toLowerCase();
-      
-      // Fetch from both parking and directory APIs to get complete unit list
-      Promise.all([
-        fetch('/api/parking').then(res => res.json()),
-        fetch('/api/directory').then(res => res.json())
-      ])
-        .then(([parkingData, directoryData]) => {
-          const unitSet = new Set<string>();
-          
-          // Get units from parking spots for this property
-          if (parkingData.spots) {
-            parkingData.spots.forEach((s: { unit_number?: string; property?: string }) => {
-              if (s.unit_number && s.property?.toLowerCase() === spotPropertyLower) {
-                unitSet.add(s.unit_number);
-              }
-            });
-          }
-          
-          // Also get units from directory for this property (catches units without parking)
-          if (directoryData.directory) {
-            directoryData.directory.forEach((entry: { unitNumber?: string; property?: string }) => {
-              if (entry.unitNumber && entry.property?.toLowerCase() === spotPropertyLower) {
-                unitSet.add(entry.unitNumber);
-              }
-            });
-          }
-          
-          // Sort units naturally (1, 2, 10 instead of 1, 10, 2)
-          const sortedUnits = Array.from(unitSet).sort((a, b) => {
-            const numA = parseInt(a.replace(/\D/g, '')) || 0;
-            const numB = parseInt(b.replace(/\D/g, '')) || 0;
-            return numA - numB;
-          });
-          setUnits(sortedUnits);
-        })
-        .catch(() => setUnits([]))
-        .finally(() => setLoadingUnits(false));
-    }
-  }, [open, spot?.property]);
+  // Get units for the property from the static PROPERTY_UNITS mapping
+  const units = spot?.property ? (PROPERTY_UNITS[spot.property] || []) : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,40 +154,21 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
                 <Home className="h-3 w-3" />
                 Unit Number *
               </Label>
-              {units.length > 0 ? (
-                <div className="space-y-2">
-                  <Select
-                    value={formData.unit_number}
-                    onValueChange={(value) => setFormData({ ...formData, unit_number: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={loadingUnits ? "Loading..." : "Select unit"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {units.map((unit) => (
-                        <SelectItem key={unit} value={unit}>
-                          {unit}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    id="unit_number_manual"
-                    value={formData.unit_number}
-                    onChange={(e) => setFormData({ ...formData, unit_number: e.target.value })}
-                    placeholder="Or type unit number"
-                    className="text-sm"
-                  />
-                </div>
-              ) : (
-                <Input
-                  id="unit_number"
-                  value={formData.unit_number}
-                  onChange={(e) => setFormData({ ...formData, unit_number: e.target.value })}
-                  placeholder={loadingUnits ? "Loading..." : "Enter unit number"}
-                  required
-                />
-              )}
+              <Select
+                value={formData.unit_number}
+                onValueChange={(value) => setFormData({ ...formData, unit_number: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {units.map((unit) => (
+                    <SelectItem key={unit} value={unit}>
+                      {unit}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           
