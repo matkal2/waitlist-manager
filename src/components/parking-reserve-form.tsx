@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -48,7 +47,6 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
     applicant_name: '',
     unit_number: '',
     expected_move_in: '',
-    notes: '',
   });
 
   // Get units for the property from the static PROPERTY_UNITS mapping
@@ -74,7 +72,6 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
           applicant_name: formData.applicant_name,
           unit_number: formData.unit_number,
           expected_move_in: formData.expected_move_in || null,
-          notes: formData.notes || null,
         }),
       });
       
@@ -89,7 +86,6 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
         applicant_name: '',
         unit_number: '',
         expected_move_in: '',
-        notes: '',
       });
       onOpenChange(false);
       onSuccess();
@@ -106,7 +102,6 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
       applicant_name: '',
       unit_number: '',
       expected_move_in: '',
-      notes: '',
     });
     onOpenChange(false);
   };
@@ -183,17 +178,6 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
               value={formData.expected_move_in}
               onChange={(e) => setFormData({ ...formData, expected_move_in: e.target.value })}
               required
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Any additional notes about this reservation..."
-              rows={2}
             />
           </div>
           
