@@ -1649,6 +1649,20 @@ export default function ParkingPage() {
                                       )}
                                     </div>
                                   )}
+                                  {spot.reserved_for_applicant && (
+                                    <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-sm">
+                                      <span className="text-amber-700 font-medium">Reserved for: </span>
+                                      <span className="text-amber-600">{spot.reserved_for_applicant}</span>
+                                      {spot.reserved_for_unit && (
+                                        <span className="text-amber-600"> (Unit {spot.reserved_for_unit})</span>
+                                      )}
+                                      {spot.expected_move_in && (
+                                        <span className="text-amber-500 text-xs ml-2">
+                                          (expected move-in {new Date(spot.expected_move_in + 'T00:00:00').toLocaleDateString()})
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}
