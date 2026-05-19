@@ -44,13 +44,12 @@ interface ParkingChangeFormProps {
   spots: ParkingSpot[];
 }
 
-type ChangeType = 'Termination' | 'Add' | 'Transfer' | 'New Lease Signed';
+type ChangeType = 'Termination' | 'Add' | 'Transfer';
 
 const CHANGE_TYPES: { value: ChangeType; label: string; description: string }[] = [
   { value: 'Termination', label: 'Termination', description: 'Tenant ending their parking spot' },
   { value: 'Add', label: 'Add', description: 'Existing tenant adding a parking spot' },
   { value: 'Transfer', label: 'Transfer', description: 'Move tenant from one spot to another' },
-  { value: 'New Lease Signed', label: 'New Lease Signed', description: 'New tenant getting parking with lease' },
 ];
 
 export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, spots }: ParkingChangeFormProps) {
@@ -215,7 +214,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
         if (changeType === 'Termination') {
           // Termination: Show spots that have tenants (Occupied, Notice, Future)
           return spot.status === 'Occupied' || spot.status === 'Notice' || spot.status === 'Future';
-        } else if (changeType === 'Add' || changeType === 'New Lease Signed') {
+        } else if (changeType === 'Add') {
           // Add/New Lease: Show Vacant + Notice spots that are available by effective date
           // Exclude Reserved spots - they are held for applicants in screening
           if (spot.status === 'Reserved') return false;
@@ -300,7 +299,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
     }
 
     // Auto-set effective date for Add/New Lease/Transfer operations
-    if (changeType === 'Add' || changeType === 'New Lease Signed' || (changeType === 'Transfer' && isTransferTo)) {
+    if (changeType === 'Add' || (changeType === 'Transfer' && isTransferTo)) {
       const minDate = getMinEffectiveDate(spaceCode);
       // Only auto-set if current effective date is empty or before the minimum
       if (!effectiveDate || effectiveDate < minDate) {
@@ -343,7 +342,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
     // Date validation for Notice spots - effective date must be on or after available date
     if (effectiveDate && primarySpace) {
       const spotToCheck = changeType === 'Transfer' ? transferToSpace : primarySpace;
-      if (spotToCheck && (changeType === 'Add' || changeType === 'New Lease Signed' || changeType === 'Transfer')) {
+      if (spotToCheck && (changeType === 'Add' || changeType === 'Transfer')) {
         const minDate = getMinEffectiveDate(spotToCheck);
         if (effectiveDate < minDate) {
           const spot = getSelectedSpotDetails(spotToCheck);
@@ -599,7 +598,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                 onChange={(e) => {
                   setEffectiveDate(e.target.value);
                   // Reset space selections when date changes (available spots may change)
-                  if (changeType === 'Add' || changeType === 'New Lease Signed' || changeType === 'Transfer') {
+                  if (changeType === 'Add' || changeType === 'Transfer') {
                     setPrimarySpace('');
                     setTransferToSpace('');
                   }
@@ -610,7 +609,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
               {validationErrors.effectiveDate && (
                 <p className="text-sm text-red-500 mt-1">{validationErrors.effectiveDate}</p>
               )}
-              {(changeType === 'Add' || changeType === 'New Lease Signed') && (
+              {changeType === 'Add' && (
                 <p className="text-xs text-muted-foreground mt-1">
                   Available spots will filter based on this date
                 </p>
@@ -624,7 +623,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                   Primary Space *
                   {changeType && (
                     <span className="text-xs text-muted-foreground ml-1">
-                      ({changeType === 'Add' || changeType === 'New Lease Signed' ? 'Available spots' : 'Occupied spots'})
+                      ({changeType === 'Add' ? 'Available spots' : 'Occupied spots'})
                     </span>
                   )}
                 </Label>
@@ -652,7 +651,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                     !tenantName ? "Select tenant first" :
                     !effectiveDate ? "Select effective date first" :
                     !selectedProperty ? "Select property first" : 
-                    changeType === 'Add' || changeType === 'New Lease Signed' ? "Select available space..." :
+                    changeType === 'Add' ? "Select available space..." :
                     "Select occupied space..."
                   } />
                 </SelectTrigger>
@@ -661,7 +660,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                     <SelectItem key={spot.value} value={spot.label}>
                       <div className="flex items-center gap-2">
                         <span>{spot.label}</span>
-                        {(changeType === 'Add' || changeType === 'New Lease Signed') && spot.status === 'Notice' && (
+                        {changeType === 'Add' && spot.status === 'Notice' && (
                           <Badge variant="outline" className="text-xs bg-orange-50 text-orange-600 border-orange-200">
                             Available {spot.availableDate ? new Date(spot.availableDate).toLocaleDateString() : ''}
                           </Badge>
