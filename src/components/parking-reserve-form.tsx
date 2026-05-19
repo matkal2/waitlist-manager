@@ -62,10 +62,11 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
         .then(data => {
           // Extract unique unit numbers from directory for this property
           const unitSet = new Set<string>();
+          const spotPropertyLower = spot.property.toLowerCase();
           if (data.directory) {
             data.directory.forEach((entry: { unitNumber?: string; property?: string }) => {
-              // Filter by property and extract unit numbers
-              if (entry.unitNumber && entry.property === spot.property) {
+              // Filter by property (case-insensitive) and extract unit numbers
+              if (entry.unitNumber && entry.property?.toLowerCase() === spotPropertyLower) {
                 unitSet.add(entry.unitNumber);
               }
             });
