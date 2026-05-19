@@ -26,6 +26,7 @@ import { ParkingReserveForm } from '@/components/parking-reserve-form';
 import { ParkingReservationMatches } from '@/components/parking-reservation-matches';
 import { ParkingWaitlistTable } from '@/components/parking-waitlist-table';
 import { exportParkingToPDF } from '@/lib/pdf-export';
+import { permissions } from '@/lib/permissions';
 
 interface ParkingSpot {
   id: string;
@@ -96,7 +97,7 @@ interface ParkingCachedData {
 }
 
 export default function ParkingPage() {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, userRole } = useAuth();
   const router = useRouter();
   const [spots, setSpots] = useState<ParkingSpot[]>([]);
   const [properties, setProperties] = useState<string[]>([]);
@@ -942,24 +943,26 @@ export default function ParkingPage() {
                                             <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-50 text-amber-600 border-amber-300">
                                               Reserved
                                             </Badge>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className="h-5 w-5 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 ml-1"
-                                              onClick={() => spot.reservation_id && cancelReservation(spot.reservation_id)}
-                                              disabled={cancellingReservation === spot.reservation_id}
-                                              title="Cancel reservation"
-                                            >
-                                              {cancellingReservation === spot.reservation_id ? (
-                                                <RefreshCw className="h-3 w-3 animate-spin" />
-                                              ) : (
-                                                <span className="text-xs">✕</span>
-                                              )}
-                                            </Button>
+                                            {permissions.canCancelReservation(userRole) && (
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-5 w-5 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 ml-1"
+                                                onClick={() => spot.reservation_id && cancelReservation(spot.reservation_id)}
+                                                disabled={cancellingReservation === spot.reservation_id}
+                                                title="Cancel reservation"
+                                              >
+                                                {cancellingReservation === spot.reservation_id ? (
+                                                  <RefreshCw className="h-3 w-3 animate-spin" />
+                                                ) : (
+                                                  <span className="text-xs">✕</span>
+                                                )}
+                                              </Button>
+                                            )}
                                           </div>
                                         )}
                                       </div>
-                                      {spot.status === 'Notice' && !spot.has_future_tenant && !spot.reserved_for_applicant && (
+                                      {spot.status === 'Notice' && !spot.has_future_tenant && !spot.reserved_for_applicant && permissions.canReserveSpot(userRole) && (
                                         <Button
                                           variant="outline"
                                           size="sm"
@@ -981,24 +984,26 @@ export default function ParkingPage() {
                                         <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-50 text-amber-600 border-amber-300">
                                           Applicant
                                         </Badge>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-5 w-5 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 ml-1"
-                                          onClick={() => spot.reservation_id && cancelReservation(spot.reservation_id)}
-                                          disabled={cancellingReservation === spot.reservation_id}
-                                          title="Cancel reservation"
-                                        >
-                                          {cancellingReservation === spot.reservation_id ? (
-                                            <RefreshCw className="h-3 w-3 animate-spin" />
-                                          ) : (
-                                            <span className="text-xs">✕</span>
-                                          )}
-                                        </Button>
+                                        {permissions.canCancelReservation(userRole) && (
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-5 w-5 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 ml-1"
+                                            onClick={() => spot.reservation_id && cancelReservation(spot.reservation_id)}
+                                            disabled={cancellingReservation === spot.reservation_id}
+                                            title="Cancel reservation"
+                                          >
+                                            {cancellingReservation === spot.reservation_id ? (
+                                              <RefreshCw className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <span className="text-xs">✕</span>
+                                            )}
+                                          </Button>
+                                        )}
                                       </div>
                                       <span className="text-muted-foreground text-xs">Unit {spot.reserved_for_unit}</span>
                                     </div>
-                                  ) : spot.status === 'Vacant' && !spot.has_future_tenant ? (
+                                  ) : spot.status === 'Vacant' && !spot.has_future_tenant && permissions.canReserveSpot(userRole) ? (
                                     <Button
                                       variant="outline"
                                       size="sm"

@@ -40,6 +40,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Shield, UserPlus, Users, Mail, Trash2, ArrowLeft, User, Key, LogOut } from 'lucide-react';
+import { UserRole, ROLE_LABELS } from '@/lib/permissions';
 
 // Admin email - only this user can access admin features
 const ADMIN_EMAIL = 'mkaleb@hpvgproperties.com';
@@ -56,7 +57,7 @@ interface UserProfile {
   email: string;
   full_name: string;
   created_at: string;
-  role: 'Admin' | 'General';
+  role: UserRole;
 }
 
 interface PendingInvite {
@@ -120,7 +121,7 @@ export default function AdminPage() {
         
         const mappedUsers = (data || []).map(u => ({
           ...u,
-          role: u.is_admin ? 'Admin' as const : 'General' as const
+          role: (u.role || (u.is_admin ? 'admin' : 'leasing_agent')) as UserRole
         }));
         setUsers(mappedUsers);
       }
@@ -131,11 +132,11 @@ export default function AdminPage() {
     }
   };
 
-  const handleRoleChange = async (userId: string, newRole: 'Admin' | 'General') => {
+  const handleRoleChange = async (userId: string, newRole: UserRole) => {
     try {
       const { error } = await supabase
         .from('user_profiles')
-        .update({ is_admin: newRole === 'Admin' })
+        .update({ role: newRole, is_admin: newRole === 'admin' })
         .eq('id', userId);
 
       if (error) throw error;
@@ -448,7 +449,7 @@ export default function AdminPage() {
               Registered Users
             </CardTitle>
             <CardDescription>
-              Manage user access and roles (Admin or General)
+              Manage user access and roles
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -473,18 +474,21 @@ export default function AdminPage() {
                       <TableCell>
                         <Select
                           value={userProfile.role}
-                          onValueChange={(value) => handleRoleChange(userProfile.id, value as 'Admin' | 'General')}
+                          onValueChange={(value) => handleRoleChange(userProfile.id, value as UserRole)}
                           disabled={userProfile.email === ADMIN_EMAIL || userProfile.email === 'matthew.kaleb1763@gmail.com'}
                         >
-                          <SelectTrigger className="w-[120px]">
-                            <SelectValue />
+                          <SelectTrigger className="w-[150px]">
+                            <SelectValue>{ROLE_LABELS[userProfile.role]}</SelectValue>
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Admin">
+                            <SelectItem value="admin">
                               <Badge className="bg-purple-100 text-purple-800">Admin</Badge>
                             </SelectItem>
-                            <SelectItem value="General">
-                              <Badge variant="secondary">General</Badge>
+                            <SelectItem value="leasing_agent">
+                              <Badge className="bg-blue-100 text-blue-800">Leasing Agent</Badge>
+                            </SelectItem>
+                            <SelectItem value="property_manager">
+                              <Badge className="bg-green-100 text-green-800">Property Manager</Badge>
                             </SelectItem>
                           </SelectContent>
                         </Select>

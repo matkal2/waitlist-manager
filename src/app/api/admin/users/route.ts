@@ -22,7 +22,7 @@ export async function GET() {
           id: p.id,
           email: p.email,
           full_name: p.full_name,
-          role: p.is_admin ? 'Admin' : 'General',
+          role: p.role || (p.is_admin ? 'admin' : 'leasing_agent'),
           created_at: p.created_at
         }))
       });
@@ -34,21 +34,21 @@ export async function GET() {
         id: '1',
         email: 'matthew.kaleb1763@gmail.com',
         full_name: 'Matthew Kaleb',
-        role: 'Admin',
+        role: 'admin',
         created_at: new Date().toISOString()
       },
       {
         id: '2', 
         email: 'mkaleb@hpvgproperties.com',
         full_name: 'Matthew Kaleb',
-        role: 'Admin',
+        role: 'admin',
         created_at: new Date().toISOString()
       },
       {
         id: '3',
         email: 'mdillon@hpvgproperties.com',
         full_name: 'Michael Dillon',
-        role: 'General',
+        role: 'leasing_agent',
         created_at: new Date().toISOString()
       }
     ];

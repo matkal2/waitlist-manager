@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Building2, Users, Car, LogOut, User, Key, Shield, ArrowRight } from 'lucide-react';
+import { permissions } from '@/lib/permissions';
 
 const ADMIN_EMAIL = 'mkaleb@hpvgproperties.com';
 
@@ -25,7 +26,7 @@ const EMAIL_TO_NAME: Record<string, string> = {
 };
 
 export default function Home() {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, userRole } = useAuth();
   const router = useRouter();
   const [userFullName, setUserFullName] = useState<string | null>(null);
 
@@ -116,7 +117,7 @@ export default function Home() {
                     <Key className="h-4 w-4 mr-2" />
                     Change Password
                   </DropdownMenuItem>
-                  {(user?.email === ADMIN_EMAIL || user?.email === 'matthew.kaleb1763@gmail.com') && (
+                  {permissions.canAccessAdmin(userRole) && (
                     <DropdownMenuItem onClick={() => router.push('/admin')}>
                       <Shield className="h-4 w-4 mr-2" />
                       Admin Panel
@@ -144,27 +145,29 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Waitlist Manager Card */}
-          <Card 
-            className="cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02] border-2 hover:border-primary"
-            onClick={() => router.push('/waitlist')}
-          >
-            <CardHeader className="text-center py-12">
-              <div className="mx-auto mb-6 w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                <Users className="h-10 w-10 text-blue-600 dark:text-blue-400" />
-              </div>
-              <CardTitle className="text-2xl mb-2">Waitlist Manager</CardTitle>
-              <CardDescription className="text-base">
-                Manage prospect and transfer waitlists, track leads, and match available units.
-              </CardDescription>
-              <div className="mt-6">
-                <Button variant="outline" className="gap-2">
-                  Open Module <ArrowRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-          </Card>
+        <div className={`grid grid-cols-1 ${permissions.canAccessWaitlist(userRole) ? 'md:grid-cols-2' : ''} gap-8 ${!permissions.canAccessWaitlist(userRole) ? 'max-w-md mx-auto' : ''}`}>
+          {/* Waitlist Manager Card - Hidden for Property Manager */}
+          {permissions.canAccessWaitlist(userRole) && (
+            <Card 
+              className="cursor-pointer hover:shadow-lg transition-all hover:scale-[1.02] border-2 hover:border-primary"
+              onClick={() => router.push('/waitlist')}
+            >
+              <CardHeader className="text-center py-12">
+                <div className="mx-auto mb-6 w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                  <Users className="h-10 w-10 text-blue-600 dark:text-blue-400" />
+                </div>
+                <CardTitle className="text-2xl mb-2">Waitlist Manager</CardTitle>
+                <CardDescription className="text-base">
+                  Manage prospect and transfer waitlists, track leads, and match available units.
+                </CardDescription>
+                <div className="mt-6">
+                  <Button variant="outline" className="gap-2">
+                    Open Module <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+            </Card>
+          )}
 
           {/* Parking Manager Card */}
           <Card 
