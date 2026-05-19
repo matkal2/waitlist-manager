@@ -920,7 +920,7 @@ export default function ParkingPage() {
                                       </div>
                                       <span className="text-muted-foreground text-xs">Unit {spot.reserved_for_unit}</span>
                                     </div>
-                                  ) : spot.status === 'Vacant' && !spot.has_future_tenant ? (
+                                  ) : (spot.status === 'Vacant' || spot.status === 'Notice') && !spot.has_future_tenant ? (
                                     <Button
                                       variant="outline"
                                       size="sm"
