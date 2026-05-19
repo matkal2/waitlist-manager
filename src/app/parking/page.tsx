@@ -121,6 +121,7 @@ export default function ParkingPage() {
   // Reserve spot dialog
   const [showReserveForm, setShowReserveForm] = useState(false);
   const [spotToReserve, setSpotToReserve] = useState<ParkingSpot | null>(null);
+  const [cancellingReservation, setCancellingReservation] = useState<string | null>(null);
   
   // Historical trends
   const [snapshotsCaptured, setSnapshotsCaptured] = useState(false);
@@ -209,6 +210,30 @@ export default function ParkingPage() {
     } finally {
       setLoading(false);
       setIsBackgroundRefresh(false);
+    }
+  };
+
+  const cancelReservation = async (reservationId: string) => {
+    if (!confirm('Are you sure you want to cancel this reservation?')) return;
+    
+    setCancellingReservation(reservationId);
+    try {
+      const response = await fetch(`/api/parking/reservations?id=${reservationId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to cancel reservation');
+      }
+      
+      // Refresh data to show updated spot status
+      await fetchData(false);
+    } catch (error) {
+      console.error('Error cancelling reservation:', error);
+      alert(error instanceof Error ? error.message : 'Failed to cancel reservation');
+    } finally {
+      setCancellingReservation(null);
     }
   };
 
@@ -917,6 +942,20 @@ export default function ParkingPage() {
                                             <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-50 text-amber-600 border-amber-300">
                                               Reserved
                                             </Badge>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-5 w-5 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 ml-1"
+                                              onClick={() => spot.reservation_id && cancelReservation(spot.reservation_id)}
+                                              disabled={cancellingReservation === spot.reservation_id}
+                                              title="Cancel reservation"
+                                            >
+                                              {cancellingReservation === spot.reservation_id ? (
+                                                <RefreshCw className="h-3 w-3 animate-spin" />
+                                              ) : (
+                                                <span className="text-xs">✕</span>
+                                              )}
+                                            </Button>
                                           </div>
                                         )}
                                       </div>
@@ -942,6 +981,20 @@ export default function ParkingPage() {
                                         <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-50 text-amber-600 border-amber-300">
                                           Applicant
                                         </Badge>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-5 w-5 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 ml-1"
+                                          onClick={() => spot.reservation_id && cancelReservation(spot.reservation_id)}
+                                          disabled={cancellingReservation === spot.reservation_id}
+                                          title="Cancel reservation"
+                                        >
+                                          {cancellingReservation === spot.reservation_id ? (
+                                            <RefreshCw className="h-3 w-3 animate-spin" />
+                                          ) : (
+                                            <span className="text-xs">✕</span>
+                                          )}
+                                        </Button>
                                       </div>
                                       <span className="text-muted-foreground text-xs">Unit {spot.reserved_for_unit}</span>
                                     </div>
