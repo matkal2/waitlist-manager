@@ -592,14 +592,14 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                           setSelectedProperty(spot.property);
                           setValidationErrors(prev => ({ ...prev, primarySpace: '', property: '' }));
                         }}
-                        className={`px-3 py-2 rounded-md border text-sm font-medium transition-all ${
+                        className={`px-2 py-1 rounded border text-xs font-medium transition-all ${
                           primarySpace === spot.full_space_code
                             ? 'bg-red-600 text-white border-red-600'
                             : 'bg-white dark:bg-gray-800 text-red-700 dark:text-red-300 border-red-300 hover:bg-red-100 dark:hover:bg-red-900'
                         }`}
                       >
                         {spot.full_space_code}
-                        <span className={`ml-1 text-xs ${primarySpace === spot.full_space_code ? 'text-red-200' : 'text-muted-foreground'}`}>
+                        <span className={`ml-1 text-[10px] ${primarySpace === spot.full_space_code ? 'text-red-200' : 'text-muted-foreground'}`}>
                           ({spot.status})
                         </span>
                       </button>
@@ -758,10 +758,10 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
             {/* For Termination: Show selected spot info */}
             {changeType === 'Termination' && primarySpace && (
               <div>
-                <Label>Selected Spot</Label>
-                <div className="mt-1 p-2 bg-red-50 border border-red-200 rounded-md">
+                <Label className="text-xs">Selected Spot</Label>
+                <div className="mt-1 px-2 py-1 bg-red-50 border border-red-200 rounded text-xs">
                   <span className="font-medium text-red-700">{primarySpace}</span>
-                  <span className="text-xs text-red-600 ml-2">will be terminated</span>
+                  <span className="text-red-500 ml-1">to terminate</span>
                 </div>
               </div>
             )}
