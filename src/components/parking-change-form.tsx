@@ -120,8 +120,10 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
     setValidationErrors(prev => ({ ...prev, tenantName: '' }));
     
     // Auto-populate property if available
+    console.log('Selected tenant:', entry.residentName, 'property:', entry.property, 'available properties:', properties);
     if (entry.property) {
       // Map directory property names to parking property names
+      // Handle various formats: "440 Green Bay", "Green Bay 440", "GREEN BAY", etc.
       const propertyNameMap: Record<string, string> = {
         'Broadway': 'Broadway',
         'Granville': 'Granville',
@@ -144,7 +146,23 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
         'Countryside T': 'Countryside T',
         'Elston': 'Elston',
       };
-      const mappedProperty = propertyNameMap[entry.property] || entry.property;
+      
+      let mappedProperty = propertyNameMap[entry.property];
+      
+      // If no exact match, try to find Green Bay with number
+      if (!mappedProperty && entry.property.toLowerCase().includes('green bay')) {
+        const numMatch = entry.property.match(/(\d{3})/);
+        if (numMatch) {
+          mappedProperty = `Green Bay ${numMatch[1]}`;
+        }
+      }
+      
+      // Fallback to the property as-is
+      if (!mappedProperty) {
+        mappedProperty = entry.property;
+      }
+      
+      console.log('Mapped property:', mappedProperty, 'includes:', properties.includes(mappedProperty));
       if (properties.includes(mappedProperty)) {
         setSelectedProperty(mappedProperty);
         setValidationErrors(prev => ({ ...prev, property: '' }));

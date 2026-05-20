@@ -51,8 +51,8 @@ async function fetchDirectory(): Promise<DirectoryEntry[]> {
     // Format examples: "fullerton-413", "vista 206", "green bay 440-12"
     if (!propertyRaw && uniqueId) {
       // Special handling for Green Bay properties (need to include building number)
-      // Format: "green bay 440-12" or "green bay 246 5"
-      const greenBayMatch = uniqueId.match(/^green\s*bay\s*(\d{3})/i);
+      // Format: "green bay 440-12" or "green bay 246 5" or "greenbay440-607"
+      const greenBayMatch = uniqueId.match(/green\s*bay\s*(\d{3})/i);
       if (greenBayMatch) {
         propertyRaw = `Green Bay ${greenBayMatch[1]}`;
       } else {
@@ -62,6 +62,11 @@ async function fetchDirectory(): Promise<DirectoryEntry[]> {
           propertyRaw = match[1].trim();
         }
       }
+    }
+    
+    // Debug logging for Green Bay tenants
+    if (uniqueId && uniqueId.toLowerCase().includes('green') || residentName.toLowerCase().includes('bang')) {
+      console.log(`Directory entry: ${residentName}, propertyCol: "${cells[17]?.v}", uniqueId: "${uniqueId}", extracted property: "${propertyRaw}"`);
     }
     
     // Title case the property name
