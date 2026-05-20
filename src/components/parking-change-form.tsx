@@ -35,6 +35,7 @@ interface ParkingSpot {
   available_date?: string | null;
   has_ev_charging?: boolean;
   is_handicap?: boolean;
+  reserved_for_applicant?: string | null;
 }
 
 interface ParkingChangeFormProps {
@@ -218,6 +219,8 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
           // Add/New Lease: Show Vacant + Notice spots that are available by effective date
           // Exclude Reserved spots - they are held for applicants in screening
           if (spot.status === 'Reserved') return false;
+          // Also exclude Notice spots that have a reservation (reserved_for_applicant)
+          if (spot.reserved_for_applicant) return false;
           if (spot.status !== 'Vacant' && spot.status !== 'Notice') return false;
           return isSpotAvailableByDate(spot);
         } else if (changeType === 'Transfer') {
@@ -248,6 +251,8 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
         if (spot.property !== selectedProperty) return false;
         // Exclude Reserved spots - they are held for applicants in screening
         if (spot.status === 'Reserved') return false;
+        // Also exclude Notice spots that have a reservation
+        if (spot.reserved_for_applicant) return false;
         // Show Vacant and Notice spots that are available by effective date
         if (spot.status !== 'Vacant' && spot.status !== 'Notice') return false;
         return isSpotAvailableByDate(spot);
