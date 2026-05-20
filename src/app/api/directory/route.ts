@@ -49,8 +49,9 @@ async function fetchDirectory(): Promise<DirectoryEntry[]> {
     
     // For Green Bay properties, we ALWAYS need to extract from unique ID to get the building number
     // because the property column might just say "Green Bay" without 246/440/546
+    // Formats: "gb440 607", "gb246 5", "gb546 101" OR "green bay 440-12"
     if (uniqueId) {
-      const greenBayMatch = uniqueId.match(/green\s*bay\s*(\d{3})/i);
+      const greenBayMatch = uniqueId.match(/(?:green\s*bay|gb)\s*(\d{3})/i);
       if (greenBayMatch) {
         propertyRaw = `Green Bay ${greenBayMatch[1]}`;
       } else if (!propertyRaw) {
