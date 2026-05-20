@@ -36,14 +36,26 @@ async function fetchDirectory(): Promise<DirectoryEntry[]> {
     if (!cells) continue;
     
     // Column B (index 1) = Unit Number, Column C (index 2) = Tenant Code, 
-    // Column D (index 3) = Resident Name, Column R (index 17) = Property
+    // Column D (index 3) = Resident Name, Column R (index 17) = Property,
+    // Column S (index 18) = Unique ID (e.g., "fullerton-413" or "vista 206")
     const unitNumber = cells[1]?.v?.toString() || cells[1]?.f?.toString() || '';
     const tenantCode = cells[2]?.v?.toString() || '';
     const residentName = cells[3]?.v?.toString() || '';
-    const propertyRaw = cells[17]?.v?.toString() || '';
+    let propertyRaw = cells[17]?.v?.toString() || '';
+    const uniqueId = cells[18]?.v?.toString() || '';
     
     // Skip rows without both code and name
     if (!tenantCode || !residentName) continue;
+    
+    // If property column is empty, try to extract from unique ID
+    // Format examples: "fullerton-413", "vista 206", "green bay 440-12"
+    if (!propertyRaw && uniqueId) {
+      // Extract property name from unique ID (everything before the unit number)
+      const match = uniqueId.match(/^([a-zA-Z\s]+)/);
+      if (match) {
+        propertyRaw = match[1].trim();
+      }
+    }
     
     // Title case the property name
     const property = propertyRaw ? titleCaseProperty(propertyRaw) : undefined;
