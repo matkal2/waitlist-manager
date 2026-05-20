@@ -50,10 +50,17 @@ async function fetchDirectory(): Promise<DirectoryEntry[]> {
     // If property column is empty, try to extract from unique ID
     // Format examples: "fullerton-413", "vista 206", "green bay 440-12"
     if (!propertyRaw && uniqueId) {
-      // Extract property name from unique ID (everything before the unit number)
-      const match = uniqueId.match(/^([a-zA-Z\s]+)/);
-      if (match) {
-        propertyRaw = match[1].trim();
+      // Special handling for Green Bay properties (need to include building number)
+      // Format: "green bay 440-12" or "green bay 246 5"
+      const greenBayMatch = uniqueId.match(/^green\s*bay\s*(\d{3})/i);
+      if (greenBayMatch) {
+        propertyRaw = `Green Bay ${greenBayMatch[1]}`;
+      } else {
+        // Extract property name from unique ID (everything before the unit number)
+        const match = uniqueId.match(/^([a-zA-Z\s]+)/);
+        if (match) {
+          propertyRaw = match[1].trim();
+        }
       }
     }
     

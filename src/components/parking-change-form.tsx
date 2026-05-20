@@ -133,10 +133,13 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
         '246 Green Bay': 'Green Bay 246',
         '440 Green Bay': 'Green Bay 440',
         '546 Green Bay': 'Green Bay 546',
-        // Extracted from unique ID (title-cased)
+        // Extracted from unique ID (already formatted correctly)
+        'Green Bay 246': 'Green Bay 246',
+        'Green Bay 440': 'Green Bay 440',
+        'Green Bay 546': 'Green Bay 546',
+        // Other properties from unique ID (title-cased)
         'Fullerton': 'Fullerton',
         'Vista': 'Vista',
-        'Green Bay': 'Green Bay 440', // Default to 440 if no number specified
         'Countryside C': 'Countryside C',
         'Countryside T': 'Countryside T',
         'Elston': 'Elston',
