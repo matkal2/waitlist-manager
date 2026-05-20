@@ -47,16 +47,14 @@ async function fetchDirectory(): Promise<DirectoryEntry[]> {
     // Skip rows without both code and name
     if (!tenantCode || !residentName) continue;
     
-    // If property column is empty, try to extract from unique ID
-    // Format examples: "fullerton-413", "vista 206", "green bay 440-12"
-    if (!propertyRaw && uniqueId) {
-      // Special handling for Green Bay properties (need to include building number)
-      // Format: "green bay 440-12" or "green bay 246 5" or "greenbay440-607"
+    // For Green Bay properties, we ALWAYS need to extract from unique ID to get the building number
+    // because the property column might just say "Green Bay" without 246/440/546
+    if (uniqueId) {
       const greenBayMatch = uniqueId.match(/green\s*bay\s*(\d{3})/i);
       if (greenBayMatch) {
         propertyRaw = `Green Bay ${greenBayMatch[1]}`;
-      } else {
-        // Extract property name from unique ID (everything before the unit number)
+      } else if (!propertyRaw) {
+        // Only extract generic property from unique ID if column R is empty
         const match = uniqueId.match(/^([a-zA-Z\s]+)/);
         if (match) {
           propertyRaw = match[1].trim();
@@ -66,7 +64,7 @@ async function fetchDirectory(): Promise<DirectoryEntry[]> {
     
     // Debug logging for Green Bay tenants
     if (uniqueId && uniqueId.toLowerCase().includes('green') || residentName.toLowerCase().includes('bang')) {
-      console.log(`Directory entry: ${residentName}, propertyCol: "${cells[17]?.v}", uniqueId: "${uniqueId}", extracted property: "${propertyRaw}"`);
+      console.log(`Directory entry: ${residentName}, propertyCol: "${cells[17]?.v}", uniqueId: "${uniqueId}", final property: "${propertyRaw}"`);
     }
     
     // Title case the property name
