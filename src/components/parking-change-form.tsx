@@ -561,29 +561,74 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
               Start typing to search the resident directory
             </p>
             
-            {/* Existing Parking Spot Indicator */}
+            {/* Existing Parking Spot Indicator - For Termination, make spots selectable */}
             {tenantCode && tenantExistingSpots.length > 0 && (
-              <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
-                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+              <div className={`mt-2 p-3 rounded-md ${
+                changeType === 'Termination' 
+                  ? 'bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800' 
+                  : 'bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800'
+              }`}>
+                <div className={`flex items-center gap-2 ${
+                  changeType === 'Termination' 
+                    ? 'text-red-700 dark:text-red-300' 
+                    : 'text-blue-700 dark:text-blue-300'
+                }`}>
                   <Car className="h-4 w-4" />
                   <span className="text-sm font-medium">
-                    This tenant has {tenantExistingSpots.length} existing parking spot{tenantExistingSpots.length > 1 ? 's' : ''}:
+                    {changeType === 'Termination' 
+                      ? `Select spot to terminate:` 
+                      : `This tenant has ${tenantExistingSpots.length} existing parking spot${tenantExistingSpots.length > 1 ? 's' : ''}:`
+                    }
                   </span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {tenantExistingSpots.map(spot => (
-                    <Badge 
-                      key={spot.id} 
-                      variant="outline" 
-                      className="bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border-blue-300"
-                    >
-                      {spot.full_space_code}
-                      <span className="ml-1 text-xs text-muted-foreground">
-                        ({spot.status})
-                      </span>
-                    </Badge>
+                    changeType === 'Termination' ? (
+                      <button
+                        key={spot.id}
+                        type="button"
+                        onClick={() => {
+                          setPrimarySpace(spot.full_space_code);
+                          setSelectedProperty(spot.property);
+                          setValidationErrors(prev => ({ ...prev, primarySpace: '', property: '' }));
+                        }}
+                        className={`px-3 py-2 rounded-md border text-sm font-medium transition-all ${
+                          primarySpace === spot.full_space_code
+                            ? 'bg-red-600 text-white border-red-600'
+                            : 'bg-white dark:bg-gray-800 text-red-700 dark:text-red-300 border-red-300 hover:bg-red-100 dark:hover:bg-red-900'
+                        }`}
+                      >
+                        {spot.full_space_code}
+                        <span className={`ml-1 text-xs ${primarySpace === spot.full_space_code ? 'text-red-200' : 'text-muted-foreground'}`}>
+                          ({spot.status})
+                        </span>
+                      </button>
+                    ) : (
+                      <Badge 
+                        key={spot.id} 
+                        variant="outline" 
+                        className="bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border-blue-300"
+                      >
+                        {spot.full_space_code}
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          ({spot.status})
+                        </span>
+                      </Badge>
+                    )
                   ))}
                 </div>
+                {changeType === 'Termination' && !primarySpace && (
+                  <p className="text-xs text-red-600 mt-2">Click a spot above to select it for termination</p>
+                )}
+              </div>
+            )}
+            
+            {/* No spots warning for Termination */}
+            {tenantCode && changeType === 'Termination' && tenantExistingSpots.length === 0 && (
+              <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                  This tenant has no parking spots assigned. Cannot process termination.
+                </p>
               </div>
             )}
           </div>
@@ -649,64 +694,77 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
               )}
             </div>
 
-            {/* Primary Space - filtered by property and change type */}
-            <div>
-              <div className="flex items-center justify-between">
-                <Label>
-                  Primary Space *
-                  {changeType && (
-                    <span className="text-xs text-muted-foreground ml-1">
-                      ({changeType === 'Add' ? 'Available spots' : 'Occupied spots'})
-                    </span>
+            {/* Primary Space - filtered by property and change type (hidden for Termination) */}
+            {changeType !== 'Termination' && (
+              <div>
+                <div className="flex items-center justify-between">
+                  <Label>
+                    Primary Space *
+                    {changeType && (
+                      <span className="text-xs text-muted-foreground ml-1">
+                        ({changeType === 'Add' ? 'Available spots' : 'Occupied spots'})
+                      </span>
+                    )}
+                  </Label>
+                  {selectedProperty && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => setShowInventoryPreview(true)}
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      Preview Inventory
+                    </Button>
                   )}
-                </Label>
-                {selectedProperty && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={() => setShowInventoryPreview(true)}
-                  >
-                    <Eye className="h-3 w-3 mr-1" />
-                    Preview Inventory
-                  </Button>
+                </div>
+                <Select
+                  value={primarySpace}
+                  onValueChange={(value) => handleSpotSelection(value, false)}
+                  disabled={!changeType || !tenantName || !effectiveDate || !selectedProperty}
+                >
+                  <SelectTrigger className={validationErrors.primarySpace ? 'border-red-500' : ''}>
+                    <SelectValue placeholder={
+                      !changeType ? "Select change type first" :
+                      !tenantName ? "Select tenant first" :
+                      !effectiveDate ? "Select effective date first" :
+                      !selectedProperty ? "Select property first" : 
+                      changeType === 'Add' ? "Select available space..." :
+                      "Select occupied space..."
+                    } />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    {availableParkingSpots.map(spot => (
+                      <SelectItem key={spot.value} value={spot.label}>
+                        <div className="flex items-center gap-2">
+                          <span>{spot.label}</span>
+                          {changeType === 'Add' && spot.status === 'Notice' && (
+                            <Badge variant="outline" className="text-xs bg-orange-50 text-orange-600 border-orange-200">
+                              Available {spot.availableDate ? new Date(spot.availableDate).toLocaleDateString() : ''}
+                            </Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {validationErrors.primarySpace && (
+                  <p className="text-sm text-red-500 mt-1">{validationErrors.primarySpace}</p>
                 )}
               </div>
-              <Select
-                value={primarySpace}
-                onValueChange={(value) => handleSpotSelection(value, false)}
-                disabled={!changeType || !tenantName || !effectiveDate || !selectedProperty}
-              >
-                <SelectTrigger className={validationErrors.primarySpace ? 'border-red-500' : ''}>
-                  <SelectValue placeholder={
-                    !changeType ? "Select change type first" :
-                    !tenantName ? "Select tenant first" :
-                    !effectiveDate ? "Select effective date first" :
-                    !selectedProperty ? "Select property first" : 
-                    changeType === 'Add' ? "Select available space..." :
-                    "Select occupied space..."
-                  } />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  {availableParkingSpots.map(spot => (
-                    <SelectItem key={spot.value} value={spot.label}>
-                      <div className="flex items-center gap-2">
-                        <span>{spot.label}</span>
-                        {changeType === 'Add' && spot.status === 'Notice' && (
-                          <Badge variant="outline" className="text-xs bg-orange-50 text-orange-600 border-orange-200">
-                            Available {spot.availableDate ? new Date(spot.availableDate).toLocaleDateString() : ''}
-                          </Badge>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {validationErrors.primarySpace && (
-                <p className="text-sm text-red-500 mt-1">{validationErrors.primarySpace}</p>
-              )}
-            </div>
+            )}
+            
+            {/* For Termination: Show selected spot info */}
+            {changeType === 'Termination' && primarySpace && (
+              <div>
+                <Label>Selected Spot</Label>
+                <div className="mt-1 p-2 bg-red-50 border border-red-200 rounded-md">
+                  <span className="font-medium text-red-700">{primarySpace}</span>
+                  <span className="text-xs text-red-600 ml-2">will be terminated</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Inventory Preview Dialog */}
