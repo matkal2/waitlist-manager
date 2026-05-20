@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -917,6 +918,18 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
               )}
             </div>
           )}
+
+          {/* Notes */}
+          <div>
+            <Label htmlFor="otherNotes">Notes <span className="text-xs text-muted-foreground">(optional)</span></Label>
+            <Textarea
+              id="otherNotes"
+              value={otherNotes}
+              onChange={(e) => setOtherNotes(e.target.value)}
+              placeholder="Add any additional notes..."
+              className="h-16 text-sm resize-none"
+            />
+          </div>
 
           {/* Submitter (auto-filled, read-only) */}
           <div className="grid grid-cols-2 gap-4">
