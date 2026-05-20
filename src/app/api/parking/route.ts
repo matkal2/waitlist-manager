@@ -454,13 +454,28 @@ export async function GET() {
     const reservations = await fetchReservations();
     const reservationMap = new Map(reservations.map(r => [r.full_space_code, r]));
     
-    // Apply reservations to spots
+    // Apply reservations to spots (or auto-convert if tenant already exists)
     console.log('Active reservations:', reservations.map(r => ({ full_space_code: r.full_space_code, applicant: r.applicant_name })));
+    
+    const reservationsToConvert: string[] = [];
     
     for (const spot of spots) {
       const reservation = reservationMap.get(spot.full_space_code);
       if (reservation) {
         console.log(`Match found: spot ${spot.full_space_code} -> reservation for ${reservation.applicant_name}`);
+        
+        // Check if spot now has a tenant or future tenant (applicant became tenant)
+        const hasTenant = spot.tenant_code || spot.future_tenant_code;
+        
+        if (hasTenant) {
+          // Tenant exists - auto-convert reservation (don't show as Reserved)
+          console.log(`Auto-converting reservation: ${spot.full_space_code} now has tenant ${spot.tenant_code || spot.future_tenant_code}`);
+          reservationsToConvert.push(reservation.id);
+          // Don't apply reservation info - let the actual tenant data drive the status
+          continue;
+        }
+        
+        // No tenant yet - apply reservation info
         // For Vacant spots: change status to Reserved
         if (spot.status === 'Vacant') {
           spot.status = 'Reserved';
@@ -473,6 +488,17 @@ export async function GET() {
           spot.reservation_date = reservation.reservation_date;
           spot.expected_move_in = reservation.expected_move_in;
         }
+      }
+    }
+    
+    // Auto-convert reservations where tenant now exists
+    if (reservationsToConvert.length > 0) {
+      console.log(`Auto-converting ${reservationsToConvert.length} reservations`);
+      for (const reservationId of reservationsToConvert) {
+        await supabase
+          .from('parking_reservations')
+          .update({ status: 'converted', converted_at: new Date().toISOString() })
+          .eq('id', reservationId);
       }
     }
     
