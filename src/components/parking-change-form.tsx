@@ -562,29 +562,35 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
               Start typing to search the resident directory
             </p>
             
-            {/* Existing Parking Spot Indicator - For Termination, make spots selectable */}
+            {/* Existing Parking Spot Indicator - For Termination/Transfer, make spots selectable */}
             {tenantCode && tenantExistingSpots.length > 0 && (
               <div className={`mt-2 p-3 rounded-md ${
                 changeType === 'Termination' 
                   ? 'bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800' 
+                  : changeType === 'Transfer'
+                  ? 'bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800'
                   : 'bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800'
               }`}>
                 <div className={`flex items-center gap-2 ${
                   changeType === 'Termination' 
                     ? 'text-red-700 dark:text-red-300' 
+                    : changeType === 'Transfer'
+                    ? 'text-amber-700 dark:text-amber-300'
                     : 'text-blue-700 dark:text-blue-300'
                 }`}>
                   <Car className="h-4 w-4" />
                   <span className="text-sm font-medium">
                     {changeType === 'Termination' 
                       ? `Select spot to terminate:` 
+                      : changeType === 'Transfer'
+                      ? `Select spot to transfer from:`
                       : `This tenant has ${tenantExistingSpots.length} existing parking spot${tenantExistingSpots.length > 1 ? 's' : ''}:`
                     }
                   </span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {tenantExistingSpots.map(spot => (
-                    changeType === 'Termination' ? (
+                    (changeType === 'Termination' || changeType === 'Transfer') ? (
                       <button
                         key={spot.id}
                         type="button"
@@ -595,12 +601,16 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                         }}
                         className={`px-2 py-1 rounded border text-xs font-medium transition-all ${
                           primarySpace === spot.full_space_code
-                            ? 'bg-red-600 text-white border-red-600'
-                            : 'bg-white dark:bg-gray-800 text-red-700 dark:text-red-300 border-red-300 hover:bg-red-100 dark:hover:bg-red-900'
+                            ? changeType === 'Termination'
+                              ? 'bg-red-600 text-white border-red-600'
+                              : 'bg-amber-600 text-white border-amber-600'
+                            : changeType === 'Termination'
+                            ? 'bg-white dark:bg-gray-800 text-red-700 dark:text-red-300 border-red-300 hover:bg-red-100 dark:hover:bg-red-900'
+                            : 'bg-white dark:bg-gray-800 text-amber-700 dark:text-amber-300 border-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900'
                         }`}
                       >
                         {spot.full_space_code}
-                        <span className={`ml-1 text-[10px] ${primarySpace === spot.full_space_code ? 'text-red-200' : 'text-muted-foreground'}`}>
+                        <span className={`ml-1 text-[10px] ${primarySpace === spot.full_space_code ? (changeType === 'Termination' ? 'text-red-200' : 'text-amber-200') : 'text-muted-foreground'}`}>
                           ({spot.status})
                         </span>
                       </button>
@@ -621,14 +631,17 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                 {changeType === 'Termination' && !primarySpace && (
                   <p className="text-xs text-red-600 mt-2">Click a spot above to select it for termination</p>
                 )}
+                {changeType === 'Transfer' && !primarySpace && (
+                  <p className="text-xs text-amber-600 mt-2">Click a spot above to select it as the source</p>
+                )}
               </div>
             )}
             
-            {/* No spots warning for Termination */}
-            {tenantCode && changeType === 'Termination' && tenantExistingSpots.length === 0 && (
+            {/* No spots warning for Termination/Transfer */}
+            {tenantCode && (changeType === 'Termination' || changeType === 'Transfer') && tenantExistingSpots.length === 0 && (
               <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-md">
                 <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                  This tenant has no parking spots assigned. Cannot process termination.
+                  This tenant has no parking spots assigned. Cannot process {changeType.toLowerCase()}.
                 </p>
               </div>
             )}
@@ -695,17 +708,13 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
               )}
             </div>
 
-            {/* Primary Space - filtered by property and change type (hidden for Termination) */}
-            {changeType !== 'Termination' && (
+            {/* Primary Space - filtered by property and change type (hidden for Termination/Transfer) */}
+            {changeType === 'Add' && (
               <div>
                 <div className="flex items-center justify-between">
                   <Label>
                     Primary Space *
-                    {changeType && (
-                      <span className="text-xs text-muted-foreground ml-1">
-                        ({changeType === 'Add' ? 'Available spots' : 'Occupied spots'})
-                      </span>
-                    )}
+                    <span className="text-xs text-muted-foreground ml-1">(Available spots)</span>
                   </Label>
                   {selectedProperty && (
                     <Button
@@ -727,12 +736,10 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                 >
                   <SelectTrigger className={validationErrors.primarySpace ? 'border-red-500' : ''}>
                     <SelectValue placeholder={
-                      !changeType ? "Select change type first" :
                       !tenantName ? "Select tenant first" :
                       !effectiveDate ? "Select effective date first" :
                       !selectedProperty ? "Select property first" : 
-                      changeType === 'Add' ? "Select available space..." :
-                      "Select occupied space..."
+                      "Select available space..."
                     } />
                   </SelectTrigger>
                   <SelectContent className="max-h-[300px]">
@@ -740,7 +747,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                       <SelectItem key={spot.value} value={spot.label}>
                         <div className="flex items-center gap-2">
                           <span>{spot.label}</span>
-                          {changeType === 'Add' && spot.status === 'Notice' && (
+                          {spot.status === 'Notice' && (
                             <Badge variant="outline" className="text-xs bg-orange-50 text-orange-600 border-orange-200">
                               Available {spot.availableDate ? new Date(spot.availableDate).toLocaleDateString() : ''}
                             </Badge>
@@ -763,6 +770,17 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                 <div className="mt-1 px-2 py-1 bg-red-50 border border-red-200 rounded text-xs">
                   <span className="font-medium text-red-700">{primarySpace}</span>
                   <span className="text-red-500 ml-1">to terminate</span>
+                </div>
+              </div>
+            )}
+            
+            {/* For Transfer: Show selected spot info */}
+            {changeType === 'Transfer' && primarySpace && (
+              <div>
+                <Label className="text-xs">Transfer From</Label>
+                <div className="mt-1 px-2 py-1 bg-amber-50 border border-amber-200 rounded text-xs">
+                  <span className="font-medium text-amber-700">{primarySpace}</span>
+                  <span className="text-amber-500 ml-1">selected</span>
                 </div>
               </div>
             )}
