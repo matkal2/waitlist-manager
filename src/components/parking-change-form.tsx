@@ -690,8 +690,11 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                 onChange={(e) => {
                   setEffectiveDate(e.target.value);
                   // Reset space selections when date changes (available spots may change)
-                  if (changeType === 'Add' || changeType === 'Transfer') {
+                  if (changeType === 'Add') {
                     setPrimarySpace('');
+                  }
+                  if (changeType === 'Transfer') {
+                    // Only reset Transfer To, keep Primary Space (tenant's existing spot)
                     setTransferToSpace('');
                   }
                   setValidationErrors(prev => ({ ...prev, effectiveDate: '' }));
