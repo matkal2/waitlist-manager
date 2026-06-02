@@ -617,7 +617,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                       >
                         {spot.full_space_code}
                         <span className={`ml-1 text-[10px] ${primarySpace === spot.full_space_code ? (changeType === 'Termination' ? 'text-red-200' : 'text-amber-200') : 'text-muted-foreground'}`}>
-                          ({spot.status})
+                          ({spot.future_tenant_code === tenantCode ? 'Future' : spot.status})
                         </span>
                       </button>
                     ) : (
@@ -628,7 +628,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                       >
                         {spot.full_space_code}
                         <span className="ml-1 text-xs text-muted-foreground">
-                          ({spot.status})
+                          ({spot.future_tenant_code === tenantCode ? 'Future' : spot.status})
                         </span>
                       </Badge>
                     )
