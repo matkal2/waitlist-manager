@@ -191,9 +191,9 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
     tenantInputRef.current?.focus();
   };
 
-  // Find existing parking spots for the selected tenant
+  // Find existing parking spots for the selected tenant (current or future)
   const tenantExistingSpots = tenantCode 
-    ? spots.filter(spot => spot.tenant_code === tenantCode)
+    ? spots.filter(spot => spot.tenant_code === tenantCode || spot.future_tenant_code === tenantCode)
     : [];
 
   // Map parking property names to PROPERTY_UNITS keys (handle naming differences)
