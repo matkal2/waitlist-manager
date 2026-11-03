@@ -219,7 +219,7 @@ export default function ParkingPage() {
     
     setCancellingReservation(reservationId);
     try {
-      const cancelledBy = user?.email || 'Unknown';
+      const cancelledBy = userFullName || user?.email || 'Unknown';
       const response = await fetch(`/api/parking/reservations?id=${reservationId}&cancelled_by=${encodeURIComponent(cancelledBy)}`, {
         method: 'DELETE',
       });
@@ -1408,6 +1408,10 @@ export default function ParkingPage() {
                                   <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50">
                                     Reverted
                                   </Badge>
+                                ) : activity.type === 'Reserve' || activity.type === 'Cancel Reservation' ? (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-gray-500 border-gray-300" title="Reservations are tracked in the app only and are not synced to the sheet">
+                                    App only
+                                  </Badge>
                                 ) : activity.synced_to_sheet ? (
                                   <span title="Synced to sheet"><CheckCircle className="h-4 w-4 text-green-500" /></span>
                                 ) : (
@@ -2072,6 +2076,7 @@ export default function ParkingPage() {
         open={showReserveForm}
         onOpenChange={setShowReserveForm}
         onSuccess={() => fetchData(false)}
+        reservedBy={userFullName || user?.email || 'Unknown'}
       />
     </div>
   );

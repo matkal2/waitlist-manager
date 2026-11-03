@@ -37,9 +37,10 @@ interface ParkingReserveFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  reservedBy: string;
 }
 
-export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: ParkingReserveFormProps) {
+export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess, reservedBy }: ParkingReserveFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -72,6 +73,7 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess }: Park
           applicant_name: formData.applicant_name,
           unit_number: formData.unit_number,
           expected_move_in: formData.expected_move_in || null,
+          reserved_by: reservedBy,
         }),
       });
       
