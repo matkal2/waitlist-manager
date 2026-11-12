@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import { WaitlistEntry } from '@/types/database';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,9 +28,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase';
-import { ArrowUpDown, Search, UserCircle, ChevronDown, ChevronUp, Pencil, FileText, Phone } from 'lucide-react';
+import { ArrowUpDown, Search, ChevronDown, ChevronUp, Pencil, FileText, Phone, Users, UserPlus, Sparkles, X } from 'lucide-react';
 import { PROPERTY_UNITS } from '@/lib/property-units';
+import { ASSIGNABLE_AGENTS } from '@/lib/assignable-agents';
 import { getPropertyNicknames } from '@/lib/properties';
+import { getUnitMatchType, normalizePropertyName, type MatchableUnit } from '@/lib/waitlist-matching';
+import { getArchiveDate } from '@/lib/waitlist-retention';
 import { OutcomeTracker } from '@/components/outcome-tracker';
 
 // Map user emails to agent names
@@ -44,49 +47,20 @@ interface WaitlistTableProps {
   entries: WaitlistEntry[];
   onRefresh: () => void;
   currentUserEmail?: string;
+  units?: MatchableUnit[];
 }
 
 type SortField = 'created_at' | 'full_name' | 'entry_type' | 'max_budget' | 'move_in_date';
 type SortOrder = 'asc' | 'desc';
+type QuickFilter = 'mine' | 'open' | 'transfers' | 'section8' | 'matched';
+const QUICK_FILTERS: QuickFilter[] = ['mine', 'open', 'transfers', 'section8', 'matched'];
 
 const PROPERTIES = getPropertyNicknames();
 
-const AGENTS = ['Matthew Kaleb', 'Michael Dillon', 'Unassigned'];
 
-// Normalize property names for filtering (handles legacy naming variations)
-const normalizePropertyName = (name: string): string => {
-  const normalized = name.toLowerCase().trim();
-  
-  // Handle North Clark variations
-  if (normalized === 'n. clark' || normalized === 'n clark' || normalized === 'north clark') {
-    return 'North Clark';
-  }
-  // Handle West Montrose variations
-  if (normalized === 'w. montrose' || normalized === 'w montrose' || normalized === 'west montrose') {
-    return 'W. Montrose';
-  }
-  // Handle West Chicago variations
-  if (normalized === 'w. chicago' || normalized === 'w chicago' || normalized === 'west chicago') {
-    return 'W. Chicago';
-  }
-  // Handle Countryside variations
-  if (normalized.includes('countryside')) {
-    if (normalized.endsWith(' t') || normalized.includes('townhouse') || normalized === 'countryside_t') {
-      return 'Countryside T';
-    }
-    if (normalized.endsWith(' c') || normalized.includes('court') || normalized === 'countryside_c') {
-      return 'Countryside C';
-    }
-  }
-  // Handle Green Bay variations (address numbers can be prefix or suffix)
-  if (normalized.includes('green bay') || normalized.includes('greenbay') || /\d+.*green\s*bay|green\s*bay.*\d+/.test(normalized)) {
-    if (normalized.includes('246')) return 'Green Bay 246';
-    if (normalized.includes('440')) return 'Green Bay 440';
-    if (normalized.includes('546')) return 'Green Bay 546';
-  }
-  
-  return name; // Return original if no normalization needed
-};
+// Days since last contact before a lead is flagged amber / red
+const FOLLOW_UP_WARN_DAYS = 14;
+const FOLLOW_UP_DUE_DAYS = 30;
 
 // Format date without timezone shift (parses YYYY-MM-DD as local date)
 const formatDateLocal = (dateString: string) => {
@@ -94,7 +68,26 @@ const formatDateLocal = (dateString: string) => {
   return new Date(year, month - 1, day).toLocaleDateString();
 };
 
-export function WaitlistTable({ entries, onRefresh, currentUserEmail }: WaitlistTableProps) {
+const formatAvailableDate = (value: string | null) =>
+  !value ? 'Now' : /^\d{4}-\d{2}-\d{2}$/.test(value) ? formatDateLocal(value) : value;
+
+const daysSince = (iso: string | null) =>
+  iso ? Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)) : null;
+
+const followUpLevel = (entry: WaitlistEntry): 'ok' | 'warn' | 'due' => {
+  const days = daysSince(entry.last_contacted);
+  if (days === null || days >= FOLLOW_UP_DUE_DAYS) return 'due';
+  return days >= FOLLOW_UP_WARN_DAYS ? 'warn' : 'ok';
+};
+
+const formatWait = (iso: string) => {
+  const days = daysSince(iso) ?? 0;
+  if (days < 31) return `${days} days`;
+  const months = Math.floor(days / 30.4);
+  return months < 12 ? `${months} mo` : `${(months / 12).toFixed(1)} yr`;
+};
+
+export function WaitlistTable({ entries, onRefresh, currentUserEmail, units = [] }: WaitlistTableProps) {
   // Check if this is a page refresh - if so, clear session filters
   const isPageRefresh = typeof window !== 'undefined' && 
     performance.getEntriesByType('navigation').length > 0 &&
@@ -106,18 +99,19 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
     return sessionStorage.getItem(key) || defaultValue;
   };
 
+  const agents = [...ASSIGNABLE_AGENTS, 'Unassigned'];
   const [searchTerm, setSearchTerm] = useState('');
-  const [agentFilter, setAgentFilter] = useState<string>(() => getSessionFilter('wl_agent', ''));
+  const [agentFilter, setAgentFilter] = useState<string>(() => getSessionFilter('wl_agent', 'all'));
   const [statusFilter, setStatusFilter] = useState<string>(() => getSessionFilter('wl_status', 'all'));
-  const [propertyFilter, setPropertyFilter] = useState<string>(() => getSessionFilter('wl_property', ''));
-  const [section8Filter, setSection8Filter] = useState<string>(() => getSessionFilter('wl_section8', ''));
+  const [propertyFilter, setPropertyFilter] = useState<string>(() => getSessionFilter('wl_property', 'none'));
+  const [quickFilters, setQuickFilters] = useState<Set<QuickFilter>>(
+    () => new Set(getSessionFilter('wl_quick', '').split(',').filter(f => QUICK_FILTERS.includes(f as QuickFilter)) as QuickFilter[])
+  );
   const [sortField, setSortField] = useState<SortField>('created_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [editingEntry, setEditingEntry] = useState<WaitlistEntry | null>(null);
   const [editForm, setEditForm] = useState<Partial<WaitlistEntry>>({});
-  const [filtersComplete, setFiltersComplete] = useState(() => getSessionFilter('wl_complete', 'false') === 'true');
-  const [filterStep, setFilterStep] = useState(1);
 
   // Save filters to sessionStorage when they change (persists during session, clears on browser close)
   useEffect(() => {
@@ -125,10 +119,9 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
       sessionStorage.setItem('wl_agent', agentFilter);
       sessionStorage.setItem('wl_status', statusFilter);
       sessionStorage.setItem('wl_property', propertyFilter);
-      sessionStorage.setItem('wl_section8', section8Filter);
-      sessionStorage.setItem('wl_complete', filtersComplete.toString());
+      sessionStorage.setItem('wl_quick', [...quickFilters].join(','));
     }
-  }, [agentFilter, statusFilter, propertyFilter, section8Filter, filtersComplete]);
+  }, [agentFilter, statusFilter, propertyFilter, quickFilters]);
 
   // Get current user's agent name from email
   const currentAgent = currentUserEmail ? EMAIL_TO_AGENT[currentUserEmail] : null;
@@ -154,6 +147,21 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
     if (isUnassigned(entry.assigned_agent)) return true; // Anyone can assign unassigned entries
     return entry.assigned_agent === currentAgent; // Only assigned agent can reassign
   };
+
+  // Links from match alert emails (?entry=<id>) open that person's property and row
+  useEffect(() => {
+    const entryId = new URLSearchParams(window.location.search).get('entry');
+    const target = entryId ? entries.find(e => e.id === entryId) : undefined;
+    if (!target) return;
+    setSearchTerm('');
+    setAgentFilter('all');
+    setStatusFilter('all');
+    setQuickFilters(new Set());
+    setPropertyFilter(normalizePropertyName(target.property) || 'No property');
+    setExpandedRows(prev => new Set(prev).add(target.id));
+    window.history.replaceState(null, '', window.location.pathname);
+    setTimeout(() => document.getElementById(`entry-${target.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+  }, [entries]);
 
   const toggleRowExpanded = (id: string) => {
     const newExpanded = new Set(expandedRows);
@@ -334,425 +342,442 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
     }
   };
 
-  const filteredAndSortedEntries = entries
-    .filter(entry => {
-      const matchesSearch = 
-        entry.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        entry.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        entry.phone.includes(searchTerm);
-      
-      const matchesAgent = !agentFilter || agentFilter === 'all' || 
-        (agentFilter === 'open' ? !entry.assigned_agent : entry.assigned_agent === agentFilter);
-      
-      const matchesStatus = statusFilter === 'all' || entry.status === statusFilter;
-      
-      const matchesProperty = !propertyFilter || propertyFilter === 'all' || 
-        normalizePropertyName(entry.property) === propertyFilter;
-      
-      const matchesSection8 = !section8Filter || section8Filter === 'all' || 
-        (section8Filter === 'yes' ? entry.is_section_8 : !entry.is_section_8);
-      
-      return matchesSearch && matchesAgent && matchesStatus && matchesProperty && matchesSection8;
-    })
-    .sort((a, b) => {
-      // Always sort Internal Transfers first (Transfer First Rule)
-      if (a.entry_type !== b.entry_type) {
-        return a.entry_type === 'Internal Transfer' ? -1 : 1;
-      }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-      let comparison = 0;
-      switch (sortField) {
-        case 'created_at':
-          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-          break;
-        case 'full_name':
-          comparison = a.full_name.localeCompare(b.full_name);
-          break;
-        case 'entry_type':
-          comparison = a.entry_type.localeCompare(b.entry_type);
-          break;
-        case 'max_budget':
-          comparison = a.max_budget - b.max_budget;
-          break;
-        case 'move_in_date':
-          comparison = new Date(a.move_in_date).getTime() - new Date(b.move_in_date).getTime();
-          break;
-      }
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
+  const unitMatchesByEntry = new Map<string, MatchableUnit[]>();
+  for (const entry of entries) {
+    const matched = units.filter(unit => getUnitMatchType(entry, unit, today) !== null);
+    if (matched.length > 0) unitMatchesByEntry.set(entry.id, matched);
+  }
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'Active': return 'default';
-      case 'Showing Scheduled': return 'secondary';
-      case 'Applied': return 'outline';
-      case 'Signed Lease': return 'destructive';
-      default: return 'default';
+  const passesQuickFilter = (entry: WaitlistEntry, filter: QuickFilter) => {
+    switch (filter) {
+      case 'mine': return !!currentAgent && entry.assigned_agent === currentAgent;
+      case 'open': return isUnassigned(entry.assigned_agent);
+      case 'transfers': return entry.entry_type === 'Internal Transfer';
+      case 'section8': return entry.is_section_8;
+      case 'matched': return unitMatchesByEntry.has(entry.id);
+      default: return true;
     }
   };
 
-  // Step-by-step filter handlers
-  const handleAgentSelect = (value: string) => {
-    setAgentFilter(value);
-    setFilterStep(2);
+  const toggleQuickFilter = (filter: QuickFilter) => {
+    setQuickFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(filter)) next.delete(filter);
+      else next.add(filter);
+      return next;
+    });
   };
 
-  const handlePropertySelect = (value: string) => {
-    setPropertyFilter(value);
-    setFilterStep(3);
-  };
-
-  const handleSection8Select = (value: string) => {
-    setSection8Filter(value);
-    setFiltersComplete(true);
-  };
-
-  const handleShowAll = () => {
+  const clearFilters = () => {
+    setSearchTerm('');
     setAgentFilter('all');
-    setPropertyFilter('all');
-    setSection8Filter('all');
-    setFiltersComplete(true);
+    setStatusFilter('all');
+    setQuickFilters(new Set());
   };
 
-  const resetFilters = () => {
-    setAgentFilter('');
-    setPropertyFilter('');
-    setSection8Filter('');
-    setFilterStep(1);
-    setFiltersComplete(false);
-  };
+  const query = searchTerm.trim().toLowerCase();
+  const filteredEntries = entries.filter(entry => {
+    const matchesSearch = !query ||
+      entry.full_name.toLowerCase().includes(query) ||
+      (entry.email || '').toLowerCase().includes(query) ||
+      (entry.phone || '').includes(query);
+    const matchesAgent = !agentFilter || agentFilter === 'all' ||
+      (agentFilter === 'open' ? isUnassigned(entry.assigned_agent) : entry.assigned_agent === agentFilter);
+    const matchesStatus = statusFilter === 'all' || entry.status === statusFilter;
+    const matchesQuick = [...quickFilters].every(filter => passesQuickFilter(entry, filter));
+    return matchesSearch && matchesAgent && matchesStatus && matchesQuick;
+  });
 
-  // Show step-by-step filter wizard if filters not complete
-  if (!filtersComplete) {
-    return (
-      <div className="space-y-8">
-        <div className="text-center py-4">
-          <h2 className="text-2xl font-semibold mb-2">Select Your Filters</h2>
-          <p className="text-muted-foreground">Choose filters below to view your waitlist</p>
-        </div>
+  const sortEntries = (list: WaitlistEntry[]) => [...list].sort((a, b) => {
+    // Always sort Internal Transfers first (Transfer First Rule)
+    if (a.entry_type !== b.entry_type) {
+      return a.entry_type === 'Internal Transfer' ? -1 : 1;
+    }
+    let comparison = 0;
+    switch (sortField) {
+      case 'full_name': comparison = a.full_name.localeCompare(b.full_name); break;
+      case 'max_budget': comparison = a.max_budget - b.max_budget; break;
+      case 'move_in_date': comparison = a.move_in_date.localeCompare(b.move_in_date); break;
+      case 'entry_type': comparison = a.entry_type.localeCompare(b.entry_type); break;
+      default: comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    }
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-          {/* Step 1: Select Agent */}
-          <div className={`p-6 rounded-xl border-2 transition-all ${agentFilter ? 'border-green-500 bg-green-50 dark:bg-green-950' : 'border-primary bg-primary/5'}`}>
-            <div className="text-center mb-4">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold mx-auto mb-2 ${agentFilter ? 'bg-green-500 text-white' : 'bg-primary text-primary-foreground'}`}>
-                {agentFilter ? '✓' : '1'}
-              </div>
-              <h3 className="font-semibold">Agent</h3>
-            </div>
-            <Select value={agentFilter} onValueChange={handleAgentSelect}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select agent..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Agents</SelectItem>
-                <SelectItem value="open">Open Leads</SelectItem>
-                <SelectItem value="Matthew Kaleb">Matthew Kaleb</SelectItem>
-                <SelectItem value="Michael Dillon">Michael Dillon</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Step 2: Select Property */}
-          <div className={`p-6 rounded-xl border-2 transition-all ${!agentFilter ? 'opacity-40 pointer-events-none border-muted' : propertyFilter ? 'border-green-500 bg-green-50 dark:bg-green-950' : 'border-primary bg-primary/5'}`}>
-            <div className="text-center mb-4">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold mx-auto mb-2 ${propertyFilter ? 'bg-green-500 text-white' : agentFilter ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                {propertyFilter ? '✓' : '2'}
-              </div>
-              <h3 className="font-semibold">Property</h3>
-            </div>
-            <Select value={propertyFilter} onValueChange={handlePropertySelect} disabled={!agentFilter}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select property..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Properties</SelectItem>
-                {PROPERTIES.map(property => (
-                  <SelectItem key={property} value={property}>{property}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Step 3: Select Section 8 Filter */}
-          <div className={`p-6 rounded-xl border-2 transition-all ${!propertyFilter ? 'opacity-40 pointer-events-none border-muted' : section8Filter ? 'border-green-500 bg-green-50 dark:bg-green-950' : 'border-primary bg-primary/5'}`}>
-            <div className="text-center mb-4">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold mx-auto mb-2 ${section8Filter ? 'bg-green-500 text-white' : propertyFilter ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                {section8Filter ? '✓' : '3'}
-              </div>
-              <h3 className="font-semibold">Prospect Type</h3>
-            </div>
-            <Select value={section8Filter} onValueChange={handleSection8Select} disabled={!propertyFilter}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select type..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Prospects</SelectItem>
-                <SelectItem value="yes">Section 8 Only</SelectItem>
-                <SelectItem value="no">Non-Section 8</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Progress indicator */}
-        <div className="flex justify-center gap-2">
-          <div className={`h-2 w-16 rounded-full ${agentFilter ? 'bg-green-500' : 'bg-muted'}`} />
-          <div className={`h-2 w-16 rounded-full ${propertyFilter ? 'bg-green-500' : 'bg-muted'}`} />
-          <div className={`h-2 w-16 rounded-full ${section8Filter ? 'bg-green-500' : 'bg-muted'}`} />
-        </div>
-
-        {/* Show All Button */}
-        <div className="flex justify-center mt-6">
-          <Button variant="outline" size="lg" onClick={handleShowAll}>
-            Show All Entries
-          </Button>
-        </div>
-      </div>
-    );
+  const propertyOf = (entry: WaitlistEntry) => normalizePropertyName(entry.property) || 'No property';
+  const propertyNames = [...new Set(entries.map(propertyOf))].sort((a, b) => a.localeCompare(b));
+  const entriesByProperty = new Map<string, WaitlistEntry[]>();
+  for (const entry of filteredEntries) {
+    const property = propertyOf(entry);
+    entriesByProperty.set(property, [...(entriesByProperty.get(property) || []), entry]);
   }
+  const selectedProperty = propertyNames.includes(propertyFilter) ? propertyFilter : null;
+  const visibleEntries = selectedProperty ? (entriesByProperty.get(selectedProperty) || []) : [];
+  const hasActiveFilters = !!query || (!!agentFilter && agentFilter !== 'all') || statusFilter !== 'all' || quickFilters.size > 0;
 
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, email, or phone..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        
-        <Select value={agentFilter} onValueChange={setAgentFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by agent" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Agents</SelectItem>
-            <SelectItem value="open">Open Leads</SelectItem>
-            {uniqueAgents.map(agent => (
-              <SelectItem key={agent} value={agent}>{agent}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+  const summaryCards: { key: QuickFilter | null; label: string; value: number; icon: typeof Users; tone: string; iconBg: string }[] = [
+    { key: null, label: 'On the waitlist', value: entries.length, icon: Users, tone: 'text-blue-600', iconBg: 'bg-blue-50 dark:bg-blue-950' },
+    { key: 'open', label: 'Unassigned leads', value: entries.filter(e => isUnassigned(e.assigned_agent)).length, icon: UserPlus, tone: 'text-orange-600', iconBg: 'bg-orange-50 dark:bg-orange-950' },
+    { key: 'matched', label: 'Matched to a unit now', value: unitMatchesByEntry.size, icon: Sparkles, tone: 'text-green-600', iconBg: 'bg-green-50 dark:bg-green-950' },
+  ];
 
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="Active">Active</SelectItem>
-            <SelectItem value="Showing Scheduled">Showing Scheduled</SelectItem>
-            <SelectItem value="Applied">Applied</SelectItem>
-            <SelectItem value="Signed Lease">Signed Lease</SelectItem>
-          </SelectContent>
-        </Select>
+  const quickFilterOptions: { key: QuickFilter; label: string }[] = [
+    ...(currentAgent ? [{ key: 'mine' as const, label: 'My leads' }] : []),
+    { key: 'open', label: 'Unassigned' },
+    { key: 'transfers', label: 'Transfers' },
+    { key: 'section8', label: 'Section 8' },
+    { key: 'matched', label: 'Matched now' },
+  ];
 
-        <Select value={propertyFilter} onValueChange={setPropertyFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by property" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Properties</SelectItem>
-            {PROPERTIES.map(property => (
-              <SelectItem key={property} value={property}>{property}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+  const renderContacted = (entry: WaitlistEntry) => {
+    const level = followUpLevel(entry);
+    const days = daysSince(entry.last_contacted);
+    const color = level === 'due' ? 'text-red-600' : level === 'warn' ? 'text-amber-600' : 'text-muted-foreground';
+    return (
+      <span
+        className={`text-xs font-medium ${color}`}
+        title={entry.last_contacted ? new Date(entry.last_contacted).toLocaleDateString() : 'Never contacted'}
+      >
+        {days === null ? 'Never' : days === 0 ? 'Today' : `${days}d ago`}
+      </span>
+    );
+  };
 
-        <Select value={section8Filter} onValueChange={setSection8Filter}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Section 8" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Prospects</SelectItem>
-            <SelectItem value="yes">Section 8 Only</SelectItem>
-            <SelectItem value="no">Non-Section 8</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="rounded-md border overflow-x-auto">
-        <Table className="table-fixed w-full">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[100px]">Type</TableHead>
-              <TableHead className="w-[120px]">
-                <Button variant="ghost" size="sm" onClick={() => handleSort('full_name')}>
-                  Name <ArrowUpDown className="ml-1 h-3 w-3" />
-                </Button>
-              </TableHead>
-              <TableHead className="w-[180px]">Contact</TableHead>
-              <TableHead className="w-[90px]">Property</TableHead>
-              <TableHead className="w-[100px]">Prefs</TableHead>
-              <TableHead className="w-[70px]">
-                <Button variant="ghost" size="sm" onClick={() => handleSort('max_budget')}>
-                  Budget <ArrowUpDown className="ml-1 h-3 w-3" />
-                </Button>
-              </TableHead>
-              <TableHead className="w-[150px]">
-                <Button variant="ghost" size="sm" onClick={() => handleSort('move_in_date')}>
-                  Move-in <ArrowUpDown className="ml-1 h-3 w-3" />
-                </Button>
-              </TableHead>
-              <TableHead className="w-[110px]">Agent</TableHead>
-              <TableHead className="w-[90px]">Contacted</TableHead>
-              <TableHead className="w-[130px]">Outcome</TableHead>
-              <TableHead className="w-[90px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredAndSortedEntries.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                  No entries found
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredAndSortedEntries.map((entry) => {
-                const isExpanded = expandedRows.has(entry.id);
-                const canModify = canModifyEntry(entry);
-                return (
-                  <>
-                    <TableRow key={entry.id} className="cursor-pointer hover:bg-muted/50" onClick={() => toggleRowExpanded(entry.id)}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          <div>
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <Badge variant={entry.entry_type === 'Internal Transfer' ? 'default' : 'secondary'}>
-                                {entry.entry_type === 'Internal Transfer' ? '🏠 Transfer' : '👤 Prospect'}
-                              </Badge>
-                              {entry.is_section_8 && (
-                                <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
-                                  S8
-                                </Badge>
-                              )}
-                            </div>
-                            {entry.current_unit_number && (
-                              <span className="block text-xs text-muted-foreground mt-1">
-                                Unit {entry.current_unit_number}
-                              </span>
-                            )}
-                          </div>
+  const renderTable = (list: WaitlistEntry[], showProperty = false) => (
+    <div className="rounded-lg border overflow-x-auto bg-white dark:bg-gray-900">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/40">
+            <TableHead className="min-w-[220px]">
+              <Button variant="ghost" size="sm" className="-ml-3" onClick={() => handleSort('full_name')}>
+                Name <ArrowUpDown className="ml-1 h-3 w-3" />
+              </Button>
+            </TableHead>
+            <TableHead>
+              <Button variant="ghost" size="sm" className="-ml-3" onClick={() => handleSort('max_budget')}>
+                Wants <ArrowUpDown className="ml-1 h-3 w-3" />
+              </Button>
+            </TableHead>
+            <TableHead>
+              <Button variant="ghost" size="sm" className="-ml-3" onClick={() => handleSort('move_in_date')}>
+                Move-in <ArrowUpDown className="ml-1 h-3 w-3" />
+              </Button>
+            </TableHead>
+            <TableHead>Agent</TableHead>
+            <TableHead>Contacted</TableHead>
+            <TableHead>Outcome</TableHead>
+            <TableHead className="w-[90px]" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sortEntries(list).map(entry => {
+            const isExpanded = expandedRows.has(entry.id);
+            const canModify = canModifyEntry(entry);
+            const matchedUnits = unitMatchesByEntry.get(entry.id) || [];
+            return (
+              <Fragment key={entry.id}>
+                <TableRow id={`entry-${entry.id}`} className="cursor-pointer hover:bg-muted/50" onClick={() => toggleRowExpanded(entry.id)}>
+                  <TableCell>
+                    <div className="flex items-start gap-2">
+                      {isExpanded
+                        ? <ChevronUp className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+                        : <ChevronDown className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />}
+                      <div className="min-w-0">
+                        <div className="font-medium truncate" title={entry.full_name}>
+                          {entry.full_name}
+                          {entry.internal_notes && <FileText className="inline ml-2 h-3 w-3 text-muted-foreground" />}
                         </div>
-                      </TableCell>
-                      <TableCell className="font-medium truncate max-w-[120px]" title={entry.full_name}>
-                        {entry.full_name}
-                        {entry.internal_notes && (
-                          <FileText className="inline ml-2 h-3 w-3 text-muted-foreground" />
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-[180px]">
-                        <div className="text-sm truncate" title={entry.email}>{entry.email}</div>
-                        <div className="text-sm text-muted-foreground truncate">{entry.phone}</div>
-                      </TableCell>
-                      <TableCell className="max-w-[90px]">
-                        <div className="text-sm font-medium truncate" title={entry.property}>
-                          {entry.property || '-'}
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-[180px]">
-                        <div className="text-sm">
-                          <div>{entry.unit_type_pref}</div>
-                          <div className="text-muted-foreground">{entry.floor_pref}</div>
-                          {entry.preferred_units && (
-                            <div className="text-xs text-blue-600 break-words whitespace-normal">Units: {entry.preferred_units}</div>
+                        <div className="flex flex-wrap items-center gap-1 mt-1">
+                          {entry.entry_type === 'Internal Transfer'
+                            ? <Badge className="text-xs">Transfer</Badge>
+                            : <Badge variant="secondary" className="text-xs">Prospect</Badge>}
+                          {showProperty && (
+                            <Badge variant="outline" className="text-xs">{propertyOf(entry)}</Badge>
+                          )}
+                          {entry.is_section_8 && (
+                            <Badge variant="outline" className="text-green-600 border-green-600 text-xs">S8</Badge>
+                          )}
+                          {matchedUnits.length > 0 && (
+                            <Badge variant="outline" className="text-xs border-green-300 bg-green-50 text-green-700">
+                              {matchedUnits.length} unit{matchedUnits.length !== 1 ? 's' : ''} match
+                            </Badge>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell>${entry.max_budget.toLocaleString()}</TableCell>
-                      <TableCell>
-                        {formatDateLocal(entry.move_in_date)}
-                        {entry.move_in_date_end && (
-                          <span className="text-muted-foreground"> - {formatDateLocal(entry.move_in_date_end)}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {entry.assigned_agent ? (
-                          <div className="flex items-center gap-1">
-                            <UserCircle className="h-4 w-4" />
-                            <span className="text-sm">{entry.assigned_agent}</span>
-                          </div>
-                        ) : (
-                          <Badge variant="outline" className="text-orange-600 border-orange-600">
-                            Open Lead
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        {entry.last_contacted ? (
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(entry.last_contacted).toLocaleDateString()}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()} className="pr-4">
-                        <OutcomeTracker 
-                          entryId={entry.id} 
-                          currentStatus={entry.outcome_status} 
-                          onUpdate={onRefresh}
-                        />
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-green-500 hover:text-green-700 hover:bg-green-50"
-                            onClick={() => handleMarkContacted(entry.id, entry)}
-                            title="Mark as contacted"
-                          >
-                            <Phone className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={canModify ? "text-blue-500 hover:text-blue-700 hover:bg-blue-50" : "text-gray-300 cursor-not-allowed"}
-                            onClick={() => canModify && handleEditClick(entry)}
-                            disabled={!canModify}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {isExpanded && (
-                      <TableRow key={`${entry.id}-expanded`} className="bg-muted/30">
-                        <TableCell colSpan={10} className="p-4">
-                          <div>
-                            <h4 className="font-semibold text-sm mb-2">Internal Notes</h4>
-                            <div className="text-sm text-muted-foreground bg-white dark:bg-gray-800 p-3 rounded border min-h-[60px] max-w-full whitespace-pre-wrap break-words">
-                              {entry.internal_notes || 'No notes added'}
-                            </div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">{entry.unit_type_pref}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {entry.max_budget > 0 ? `Up to $${entry.max_budget.toLocaleString()}` : 'Any budget'}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm whitespace-nowrap">
+                    {formatDateLocal(entry.move_in_date)}
+                    {entry.move_in_date_end && (
+                      <div className="text-xs text-muted-foreground">to {formatDateLocal(entry.move_in_date_end)}</div>
                     )}
-                  </>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+                  </TableCell>
+                  <TableCell>
+                    {isUnassigned(entry.assigned_agent) ? (
+                      <Badge variant="outline" className="text-orange-600 border-orange-600">Unassigned</Badge>
+                    ) : (
+                      <span className="text-sm">{entry.assigned_agent}</span>
+                    )}
+                  </TableCell>
+                  <TableCell>{renderContacted(entry)}</TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <OutcomeTracker entryId={entry.id} currentStatus={entry.outcome_status} onUpdate={onRefresh} />
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-green-500 hover:text-green-700 hover:bg-green-50"
+                        onClick={() => handleMarkContacted(entry.id, entry)}
+                        title="Mark as contacted"
+                      >
+                        <Phone className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={canModify ? 'text-blue-500 hover:text-blue-700 hover:bg-blue-50' : 'text-gray-300 cursor-not-allowed'}
+                        onClick={() => canModify && handleEditClick(entry)}
+                        disabled={!canModify}
+                        title="Edit"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+                {isExpanded && (
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableCell colSpan={7} className="p-4">
+                      <div className="grid gap-4 md:grid-cols-3 text-sm">
+                        <div className="space-y-1">
+                          <h4 className="font-semibold">Contact</h4>
+                          <div className="break-all">{entry.email || 'No email'}</div>
+                          <div>{entry.phone || 'No phone'}</div>
+                          {entry.current_unit_number && (
+                            <div className="text-muted-foreground">Current unit {entry.current_unit_number}</div>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="font-semibold">Details</h4>
+                          <div>Floor: {entry.floor_pref || 'No Preference'}</div>
+                          {entry.preferred_units && (
+                            <div className="text-blue-600 break-words">Units: {entry.preferred_units}</div>
+                          )}
+                          <div>Status: {entry.status}</div>
+                          {getArchiveDate(entry) && (
+                            <div className="text-muted-foreground">
+                              Moves to archive {getArchiveDate(entry)!.toLocaleDateString()}
+                            </div>
+                          )}
+                          <div className="text-muted-foreground">
+                            On list since {new Date(entry.created_at).toLocaleDateString()} ({formatWait(entry.created_at)})
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="font-semibold">Matching units</h4>
+                          {matchedUnits.length === 0 ? (
+                            <div className="text-muted-foreground">None available right now</div>
+                          ) : (
+                            matchedUnits.map(unit => (
+                              <div key={unit.unique_id || unit.unit_number}>
+                                Unit {unit.unit_number} · {unit.unit_type} · ${unit.rent_price.toLocaleString()} · {formatAvailableDate(unit.available_date)}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        <div className="md:col-span-3">
+                          <h4 className="font-semibold mb-1">Internal Notes</h4>
+                          <div className="text-muted-foreground bg-white dark:bg-gray-800 p-3 rounded border whitespace-pre-wrap break-words">
+                            {entry.internal_notes || 'No notes added'}
+                          </div>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </Fragment>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      {/* Summary cards (click to filter) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {summaryCards.map(card => {
+          const Icon = card.icon;
+          const active = card.key !== null && quickFilters.has(card.key);
+          return (
+            <button
+              key={card.label}
+              type="button"
+              onClick={() => (card.key ? toggleQuickFilter(card.key) : setQuickFilters(new Set()))}
+              className={`flex items-center gap-4 rounded-xl border bg-white dark:bg-gray-900 p-4 text-left shadow-sm transition hover:shadow-md ${active ? 'border-blue-600 ring-1 ring-blue-600' : ''}`}
+            >
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${card.iconBg}`}>
+                <Icon className={`h-5 w-5 ${card.tone}`} />
+              </div>
+              <div>
+                <div className="text-2xl font-semibold tabular-nums leading-tight">{card.value}</div>
+                <div className="text-sm text-muted-foreground">{card.label}</div>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <div>
-          Showing {filteredAndSortedEntries.length} of {entries.length} entries
-          {filteredAndSortedEntries.some(e => e.entry_type === 'Internal Transfer') && (
-            <span className="ml-2 text-blue-600">• Internal Transfers shown first</span>
+      {/* Search + filters */}
+      <div className="space-y-3 rounded-xl border bg-white dark:bg-gray-900 p-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, email, or phone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={agentFilter || 'all'} onValueChange={setAgentFilter}>
+            <SelectTrigger className="w-[170px]">
+              <SelectValue placeholder="Agent" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All agents</SelectItem>
+              <SelectItem value="open">Unassigned</SelectItem>
+              {uniqueAgents.filter(agent => !isUnassigned(agent)).map(agent => (
+                <SelectItem key={agent} value={agent}>{agent}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[170px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="Active">Active</SelectItem>
+              <SelectItem value="Showing Scheduled">Showing Scheduled</SelectItem>
+              <SelectItem value="Applied">Applied</SelectItem>
+              <SelectItem value="Signed Lease">Signed Lease</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              <X className="h-4 w-4 mr-1" />
+              Clear
+            </Button>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={resetFilters}>
-          Reset Filters
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {quickFilterOptions.map(option => {
+            const active = quickFilters.has(option.key);
+            return (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => toggleQuickFilter(option.key)}
+                className={`rounded-full border px-3 py-1 text-sm transition ${active ? 'border-blue-600 bg-blue-600 text-white' : 'bg-white dark:bg-gray-900 text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      {/* Property tiles: click to open, click again to close */}
+      <div>
+        <h3 className="mb-2 text-sm font-medium text-muted-foreground">Properties</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
+          {propertyNames.map(property => {
+            const list = entriesByProperty.get(property) || [];
+            const matched = list.filter(e => unitMatchesByEntry.has(e.id)).length;
+            const active = selectedProperty === property;
+            return (
+              <button
+                key={property}
+                type="button"
+                onClick={() => setPropertyFilter(active ? 'none' : property)}
+                className={`flex flex-col items-center rounded-xl border px-3 py-4 text-center shadow-sm transition-all ${active ? 'border-blue-600 bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-gray-900 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md'} ${list.length === 0 && !active ? 'opacity-60' : ''}`}
+              >
+                <span className={`max-w-full truncate text-sm font-medium ${active ? 'text-blue-50' : 'text-muted-foreground'}`} title={property}>
+                  {property}
+                </span>
+                <span className={`mt-2 text-4xl font-bold tabular-nums leading-none ${active ? 'text-white' : 'text-gray-900 dark:text-gray-50'}`}>
+                  {list.length}
+                </span>
+                <span className={`mt-1 text-xs ${active ? 'text-blue-100' : 'text-muted-foreground'}`}>on waitlist</span>
+                <span
+                  className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${matched > 0 ? (active ? 'bg-white/20 text-white' : 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300') : (active ? 'text-blue-100' : 'text-muted-foreground')}`}
+                >
+                  {matched > 0 ? (
+                    <>
+                      <Sparkles className="h-3 w-3" />
+                      {matched} matched
+                    </>
+                  ) : 'No matches'}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Selected property (or search results across properties) */}
+      {selectedProperty ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">
+              {selectedProperty}
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                {visibleEntries.length} {visibleEntries.length === 1 ? 'entry' : 'entries'} · Internal Transfers shown first
+              </span>
+            </h3>
+            <Button variant="ghost" size="sm" onClick={() => setPropertyFilter('none')}>
+              <X className="h-4 w-4 mr-1" />
+              Close
+            </Button>
+          </div>
+          {visibleEntries.length === 0 ? (
+            <div className="rounded-xl border border-dashed py-10 text-center text-muted-foreground">
+              No entries at {selectedProperty} match these filters
+            </div>
+          ) : renderTable(visibleEntries)}
+        </div>
+      ) : query ? (
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold">
+            Search results
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {filteredEntries.length} across all properties
+            </span>
+          </h3>
+          {filteredEntries.length === 0 ? (
+            <div className="rounded-xl border border-dashed py-10 text-center text-muted-foreground">
+              No one matches &ldquo;{searchTerm}&rdquo;
+            </div>
+          ) : renderTable(filteredEntries, true)}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+          Select a property above to see its waitlist, or search by name.
+        </div>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={!!editingEntry} onOpenChange={(open) => !open && setEditingEntry(null)}>
@@ -852,7 +877,7 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail }: Waitlist
                         <SelectValue placeholder="Select agent" />
                       </SelectTrigger>
                       <SelectContent>
-                        {AGENTS.map(a => (
+                        {agents.map(a => (
                           <SelectItem key={a} value={a}>{a === 'Unassigned' ? 'Unassigned Agent' : a}</SelectItem>
                         ))}
                       </SelectContent>

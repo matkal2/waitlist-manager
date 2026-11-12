@@ -27,6 +27,7 @@ import { ParkingReservationMatches } from '@/components/parking-reservation-matc
 import { ParkingWaitlistTable } from '@/components/parking-waitlist-table';
 import { exportParkingToPDF } from '@/lib/pdf-export';
 import { permissions } from '@/lib/permissions';
+import { getSharedResidentProperties } from '@/lib/properties';
 
 interface ParkingSpot {
   id: string;
@@ -1507,13 +1508,20 @@ export default function ParkingPage() {
                   });
 
                   // Get waitlist matches for a spot
+                  // Own-property residents first, then residents of properties sharing this lot
                   const getWaitlistMatches = (spot: ParkingSpot) => {
-                    return waitlist.filter(w => 
-                      w.status === 'Active' && 
-                      w.property === spot.property &&
-                      (w.waitlist_type === '1st Spot' || 
-                       (w.waitlist_type === 'Indoor Upgrade' && spot.spot_type === 'Indoor'))
-                    );
+                    const residentProperties = [spot.property, ...getSharedResidentProperties(spot.property)];
+                    return waitlist
+                      .filter(w => 
+                        w.status === 'Active' && 
+                        residentProperties.includes(w.property) &&
+                        (w.waitlist_type === '1st Spot' || 
+                         (w.waitlist_type === 'Indoor Upgrade' && spot.spot_type === 'Indoor'))
+                      )
+                      .sort((a, b) =>
+                        residentProperties.indexOf(a.property) - residentProperties.indexOf(b.property) ||
+                        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                      );
                   };
 
                   if (upcomingSpots.length === 0) {
@@ -1630,7 +1638,7 @@ export default function ParkingPage() {
                                               >
                                                 <span className="font-medium">{match.tenant_name}</span>
                                                 <span className="text-xs text-muted-foreground">
-                                                  {match.unit_number || 'No unit'} • {match.waitlist_type} • Since {new Date(match.created_at).toLocaleDateString()}
+                                                  {match.property !== spot.property && `${match.property} resident • `}{match.unit_number || 'No unit'} • {match.waitlist_type} • Since {new Date(match.created_at).toLocaleDateString()}
                                                 </span>
                                               </DropdownMenuItem>
                                             ))}

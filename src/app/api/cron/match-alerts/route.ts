@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
+import { runWaitlistCleanup } from '@/lib/waitlist-cleanup';
 
-// This endpoint is called by Vercel Cron every 3 hours
-// It triggers the auto-notify endpoint to check for new matches
+// Called daily by Vercel Cron (see vercel.json): sends match alerts, then archives/purges expired entries
 
 export async function GET(request: Request) {
   // Verify the request is from Vercel Cron (in production)
@@ -22,11 +22,20 @@ export async function GET(request: Request) {
 
     const result = await response.json();
 
+    let cleanup: unknown;
+    try {
+      cleanup = await runWaitlistCleanup();
+    } catch (cleanupError) {
+      console.error('Cron cleanup error:', cleanupError);
+      cleanup = { error: String(cleanupError) };
+    }
+
     return NextResponse.json({
       success: true,
       triggeredAt: new Date().toISOString(),
       source: 'cron',
       result,
+      cleanup,
     });
   } catch (error) {
     console.error('Cron match-alerts error:', error);

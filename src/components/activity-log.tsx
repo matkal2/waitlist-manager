@@ -20,7 +20,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { History, RotateCcw, Search, Trash2, Pencil, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { History, RotateCcw, Search, Trash2, Pencil, Plus, ChevronDown, ChevronUp, Archive, ArchiveRestore } from 'lucide-react';
+import { getPurgeDate } from '@/lib/waitlist-retention';
 
 interface ActivityLogProps {
   onRevert?: () => void;
@@ -32,6 +33,9 @@ export function ActivityLogView({ onRevert }: ActivityLogProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
   const [reverting, setReverting] = useState<string | null>(null);
+  const [view, setView] = useState<'activity' | 'archive'>('activity');
+  const [archived, setArchived] = useState<WaitlistEntry[]>([]);
+  const [restoring, setRestoring] = useState<string | null>(null);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -69,7 +73,7 @@ export function ActivityLogView({ onRevert }: ActivityLogProps) {
         
         const { error } = await supabase
           .from('waitlist_entries')
-          .insert(insertData);
+          .insert({ ...insertData, archived_at: null });
 
         if (error) throw error;
         alert('Entry restored successfully!');
@@ -106,8 +110,55 @@ export function ActivityLogView({ onRevert }: ActivityLogProps) {
     }
   };
 
+  const fetchArchived = async () => {
+    const { data, error } = await supabase
+      .from('waitlist_entries')
+      .select('*')
+      .not('archived_at', 'is', null)
+      .order('archived_at', { ascending: false });
+    if (error) {
+      console.error('Error fetching archived entries:', error);
+      return;
+    }
+    setArchived(data || []);
+  };
+
+  const handleRestore = async (entry: WaitlistEntry) => {
+    if (!confirm(`Restore ${entry.full_name} to the waitlist? Update their move-in dates within 30 days or they will be archived again.`)) {
+      return;
+    }
+    setRestoring(entry.id);
+    try {
+      const restoredAt = new Date().toISOString();
+      const { error } = await supabase
+        .from('waitlist_entries')
+        .update({ archived_at: null, restored_at: restoredAt })
+        .eq('id', entry.id);
+      if (error) throw error;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('activity_log').insert({
+        action_type: 'restore',
+        entry_id: entry.id,
+        entry_data: entry,
+        changed_by: user?.email || 'Unknown',
+        changes: { archived_at: { old: entry.archived_at, new: null } },
+      });
+
+      fetchArchived();
+      fetchLogs();
+      onRevert?.();
+    } catch (error) {
+      console.error('Error restoring entry:', error);
+      alert('Failed to restore. Please try again.');
+    } finally {
+      setRestoring(null);
+    }
+  };
+
   useEffect(() => {
     fetchLogs();
+    fetchArchived();
   }, []);
 
   const filteredLogs = logs.filter(log => {
@@ -124,6 +175,8 @@ export function ActivityLogView({ onRevert }: ActivityLogProps) {
       case 'create': return <Plus className="h-4 w-4 text-green-500" />;
       case 'edit': return <Pencil className="h-4 w-4 text-blue-500" />;
       case 'delete': return <Trash2 className="h-4 w-4 text-red-500" />;
+      case 'archive': return <Archive className="h-4 w-4 text-amber-500" />;
+      case 'restore': return <ArchiveRestore className="h-4 w-4 text-green-500" />;
       default: return null;
     }
   };
@@ -133,6 +186,8 @@ export function ActivityLogView({ onRevert }: ActivityLogProps) {
       case 'create': return <Badge className="bg-green-100 text-green-800">Created</Badge>;
       case 'edit': return <Badge className="bg-blue-100 text-blue-800">Edited</Badge>;
       case 'delete': return <Badge className="bg-red-100 text-red-800">Deleted</Badge>;
+      case 'archive': return <Badge className="bg-amber-100 text-amber-800">Archived</Badge>;
+      case 'restore': return <Badge className="bg-green-100 text-green-800">Restored</Badge>;
       default: return <Badge>{action}</Badge>;
     }
   };
@@ -150,6 +205,74 @@ export function ActivityLogView({ onRevert }: ActivityLogProps) {
     ));
   };
 
+  const filteredArchived = archived.filter(entry =>
+    entry.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (entry.property || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const archiveView = (
+    <>
+      <p className="text-sm text-muted-foreground">
+        Prospects move here 1 month after their move-in window ends (1 year with extended retention).
+        Archived entries are permanently deleted after 6 months.
+      </p>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Property</TableHead>
+              <TableHead>Move-in</TableHead>
+              <TableHead>Agent</TableHead>
+              <TableHead>Archived</TableHead>
+              <TableHead>Deletes on</TableHead>
+              <TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredArchived.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  No archived entries
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredArchived.map(entry => (
+                <TableRow key={entry.id}>
+                  <TableCell className="font-medium">
+                    {entry.full_name}
+                    <div className="text-xs text-muted-foreground">{entry.email || entry.phone}</div>
+                  </TableCell>
+                  <TableCell>{entry.property}</TableCell>
+                  <TableCell>
+                    {entry.move_in_date}
+                    {entry.move_in_date_end && <span className="text-muted-foreground"> to {entry.move_in_date_end}</span>}
+                  </TableCell>
+                  <TableCell>{entry.assigned_agent || 'Unassigned'}</TableCell>
+                  <TableCell>{entry.archived_at ? new Date(entry.archived_at).toLocaleDateString() : ''}</TableCell>
+                  <TableCell className="text-red-600">
+                    {entry.archived_at ? getPurgeDate(entry.archived_at).toLocaleDateString() : ''}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRestore(entry)}
+                      disabled={restoring === entry.id}
+                    >
+                      <ArchiveRestore className="h-4 w-4 mr-1" />
+                      {restoring === entry.id ? 'Restoring...' : 'Restore'}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </>
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -163,9 +286,24 @@ export function ActivityLogView({ onRevert }: ActivityLogProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <History className="h-5 w-5" />
-          <h3 className="text-lg font-semibold">Activity Log</h3>
-          <Badge variant="outline">{filteredLogs.length} entries</Badge>
+          <Button
+            variant={view === 'activity' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setView('activity')}
+          >
+            <History className="h-4 w-4 mr-1" />
+            Activity
+            <Badge variant="secondary" className="ml-2">{filteredLogs.length}</Badge>
+          </Button>
+          <Button
+            variant={view === 'archive' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setView('archive')}
+          >
+            <Archive className="h-4 w-4 mr-1" />
+            Archived
+            <Badge variant="secondary" className="ml-2">{archived.length}</Badge>
+          </Button>
         </div>
         <div className="relative w-64">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -178,6 +316,8 @@ export function ActivityLogView({ onRevert }: ActivityLogProps) {
         </div>
       </div>
 
+      {view === 'archive' ? archiveView : (
+      <>
       <p className="text-sm text-muted-foreground">
         Showing activity from the last 6 months. Older logs are automatically deleted.
       </p>
@@ -277,6 +417,8 @@ export function ActivityLogView({ onRevert }: ActivityLogProps) {
           </TableBody>
         </Table>
       </div>
+      </>
+      )}
     </div>
   );
 }

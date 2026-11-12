@@ -39,7 +39,7 @@ async function fetchDirectory(): Promise<DirectoryEntry[]> {
     // Column B (index 1) = Unit Number, Column C (index 2) = Tenant Code, 
     // Column D (index 3) = Resident Name, Column I (index 8) = Status,
     // Column R (index 17) = Property, Column S (index 18) = Unique ID
-    const unitNumber = cells[1]?.v?.toString() || cells[1]?.f?.toString() || '';
+    let unitNumber = cells[1]?.v?.toString() || cells[1]?.f?.toString() || '';
     const tenantCode = cells[2]?.v?.toString() || '';
     const residentName = cells[3]?.v?.toString() || '';
     const status = cells[8]?.v?.toString() || '';
@@ -52,6 +52,15 @@ async function fetchDirectory(): Promise<DirectoryEntry[]> {
     
     // Skip rows without both code and name
     if (!tenantCode || !residentName) continue;
+
+    // Google Sheets types column B as a number, so text units like "8467-102" or "3440-G1"
+    // come back empty. Fall back to the unit in the Unique ID: "gb546 8467-102" -> "8467-102"
+    if (!unitNumber && uniqueId) {
+      const parts = uniqueId.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        unitNumber = parts.slice(1).join(' ');
+      }
+    }
     
     // For Green Bay properties, we ALWAYS need to extract from unique ID to get the building number
     // because the property column might just say "Green Bay" without 246/440/546

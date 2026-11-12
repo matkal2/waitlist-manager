@@ -120,17 +120,6 @@ export function SheetsUnits({ onUnitsLoaded }: SheetsUnitsProps) {
         } catch (notifyError) {
           console.error('Auto-notify check failed:', notifyError);
         }
-        
-        // Auto-cleanup expired prospects (2+ months past move-in date)
-        try {
-          const cleanupResponse = await fetch('/api/cleanup');
-          const cleanupData = await cleanupResponse.json();
-          if (cleanupData.deleted > 0) {
-            console.log(`Auto-cleanup: ${cleanupData.deleted} expired entries deleted`);
-          }
-        } catch (cleanupError) {
-          console.error('Auto-cleanup failed:', cleanupError);
-        }
       }
     } catch (error) {
       console.error('Error fetching units:', error);

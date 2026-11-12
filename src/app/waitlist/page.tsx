@@ -23,7 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Building2, Users, Clock, Home as HomeIcon, Bell, LogOut, History, User, Key, Shield, ArrowLeft, BarChart3 } from 'lucide-react';
+import { Building2, Home as HomeIcon, Bell, LogOut, History, User, Key, Shield, ArrowLeft, BarChart3 } from 'lucide-react';
 
 const ADMIN_EMAIL = 'mkaleb@hpvgproperties.com';
 
@@ -78,6 +78,7 @@ export default function WaitlistPage() {
       const { data, error } = await supabase
         .from('waitlist_entries')
         .select('*')
+        .is('archived_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -94,6 +95,15 @@ export default function WaitlistPage() {
   const handleSheetUnitsLoaded = useCallback((units: SheetUnit[]) => {
     setSheetUnits(units);
   }, []);
+
+  // Load available units up front so the Dashboard can show unit matches
+  useEffect(() => {
+    if (!user) return;
+    fetch('/api/sync-sheets')
+      .then(res => res.json())
+      .then(data => { if (data.success) setSheetUnits(data.units); })
+      .catch(err => console.error('Error loading available units:', err));
+  }, [user]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -269,43 +279,6 @@ export default function WaitlistPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Total Entries</CardDescription>
-              <CardTitle className="text-3xl flex items-center gap-2">
-                <Users className="h-6 w-6 text-muted-foreground" />
-                {stats.total}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Internal Transfers</CardDescription>
-              <CardTitle className="text-3xl flex items-center gap-2">
-                <Badge variant="default" className="text-lg px-2 py-1">🏠 {stats.transfers}</Badge>
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Prospects</CardDescription>
-              <CardTitle className="text-3xl flex items-center gap-2">
-                <Badge variant="secondary" className="text-lg px-2 py-1">👤 {stats.prospects}</Badge>
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Active Leads</CardDescription>
-              <CardTitle className="text-3xl flex items-center gap-2">
-                <Clock className="h-6 w-6 text-green-500" />
-                {stats.active}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
-
         <Tabs defaultValue="dashboard" className="space-y-4">
           <TabsList>
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
@@ -342,24 +315,14 @@ export default function WaitlistPage() {
           </TabsList>
 
           <TabsContent value="dashboard">
-            <Card>
-              <CardHeader>
-                <CardTitle>Waitlist Entries</CardTitle>
-                <CardDescription>
-                  All leads sorted by priority. Internal Transfers always rank higher than Prospects.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    <span className="ml-3 text-muted-foreground">Loading entries...</span>
-                  </div>
-                ) : (
-                  <WaitlistTable entries={entries} onRefresh={fetchEntries} currentUserEmail={user?.email} />
-                )}
-              </CardContent>
-            </Card>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <span className="ml-3 text-muted-foreground">Loading entries...</span>
+              </div>
+            ) : (
+              <WaitlistTable entries={entries} onRefresh={fetchEntries} currentUserEmail={user?.email} units={sheetUnits} />
+            )}
           </TabsContent>
 
           <TabsContent value="units">
@@ -410,17 +373,7 @@ export default function WaitlistPage() {
           </TabsContent>
 
           <TabsContent value="reports">
-            <Card>
-              <CardHeader>
-                <CardTitle>Performance Reports</CardTitle>
-                <CardDescription>
-                  YTD and weekly metrics for waitlist performance tracking.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <WaitlistReports />
-              </CardContent>
-            </Card>
+            <WaitlistReports />
           </TabsContent>
         </Tabs>
       </main>

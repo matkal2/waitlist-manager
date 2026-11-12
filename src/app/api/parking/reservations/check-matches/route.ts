@@ -87,7 +87,9 @@ export async function GET() {
     for (const reservation of reservations) {
       // Normalize unit numbers for comparison (remove leading zeros, trim)
       const reservationUnit = reservation.unit_number?.toString().replace(/^0+/, '').trim().toLowerCase();
-      const reservationProperty = reservation.property?.toLowerCase().trim();
+      // Applicants for a shared lot (e.g. a 546 resident on a 440 spot) record their own building in notes
+      const applicantProperty = reservation.notes?.match(/Applicant building: ([^\n]+)/)?.[1];
+      const reservationProperty = (applicantProperty || reservation.property)?.toLowerCase().trim();
       
       for (const entry of directoryEntries) {
         const entryUnit = entry.unitNumber?.toString().replace(/^0+/, '').trim().toLowerCase();

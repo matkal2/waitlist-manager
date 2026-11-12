@@ -22,12 +22,14 @@ import {
 } from '@/components/ui/dialog';
 import { Plus } from 'lucide-react';
 import { PROPERTY_UNITS } from '@/lib/property-units';
+import { ASSIGNABLE_AGENTS } from '@/lib/assignable-agents';
 
 interface AddEntryFormProps {
   onEntryAdded: () => void;
 }
 
 export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
+  const agents = ASSIGNABLE_AGENTS;
   const [open, setOpen] = useState(false);
   const [isCurrentResident, setIsCurrentResident] = useState(false);
   const [useDateRange, setUseDateRange] = useState(false);
@@ -230,8 +232,9 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
                   <SelectValue placeholder="Select agent" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Matthew Kaleb">Matthew Kaleb</SelectItem>
-                  <SelectItem value="Michael Dillon">Michael Dillon</SelectItem>
+                  {agents.map(agent => (
+                    <SelectItem key={agent} value={agent}>{agent}</SelectItem>
+                  ))}
                   <SelectItem value="Unassigned">Unassigned Agent</SelectItem>
                 </SelectContent>
               </Select>
@@ -253,9 +256,9 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
                   <SelectValue placeholder="Select property" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="246 Green Bay">246 Green Bay</SelectItem>
-                  <SelectItem value="440 Green Bay">440 Green Bay</SelectItem>
-                  <SelectItem value="546 Green Bay">546 Green Bay</SelectItem>
+                  <SelectItem value="Green Bay 246">Green Bay 246</SelectItem>
+                  <SelectItem value="Green Bay 440">Green Bay 440</SelectItem>
+                  <SelectItem value="Green Bay 546">Green Bay 546</SelectItem>
                   <SelectItem value="Broadway">Broadway</SelectItem>
                   <SelectItem value="Countryside C">Countryside C</SelectItem>
                   <SelectItem value="Countryside T">Countryside T</SelectItem>
@@ -265,7 +268,7 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
                   <SelectItem value="Kedzie">Kedzie</SelectItem>
                   <SelectItem value="Kennedy">Kennedy</SelectItem>
                   <SelectItem value="Liberty">Liberty</SelectItem>
-                  <SelectItem value="N. Clark">N. Clark</SelectItem>
+                  <SelectItem value="North Clark">North Clark</SelectItem>
                   <SelectItem value="Park">Park</SelectItem>
                   <SelectItem value="Rogers">Rogers</SelectItem>
                   <SelectItem value="Sheffield">Sheffield</SelectItem>

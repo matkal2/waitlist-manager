@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Calendar, User, Home } from 'lucide-react';
 import { PROPERTY_UNITS } from '@/lib/property-units';
+import { getSharedResidentProperties } from '@/lib/properties';
 
 interface ParkingSpot {
   id: string;
@@ -50,8 +51,19 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess, reserv
     expected_move_in: '',
   });
 
-  // Get units for the property from the static PROPERTY_UNITS mapping
-  const units = spot?.property ? (PROPERTY_UNITS[spot.property] || []) : [];
+  // Applicant may live at the spot's property or at a property that shares this lot
+  const [applicantProperty, setApplicantProperty] = useState(spot?.property || '');
+  const applicantPropertyOptions = spot?.property
+    ? [spot.property, ...getSharedResidentProperties(spot.property)]
+    : [];
+
+  useEffect(() => {
+    setApplicantProperty(spot?.property || '');
+    setFormData(prev => ({ ...prev, unit_number: '' }));
+  }, [spot?.property, spot?.full_space_code]);
+
+  // Get units for the applicant's property from the static PROPERTY_UNITS mapping
+  const units = applicantProperty ? (PROPERTY_UNITS[applicantProperty] || []) : [];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,6 +86,9 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess, reserv
           unit_number: formData.unit_number,
           expected_move_in: formData.expected_move_in || null,
           reserved_by: reservedBy,
+          notes: applicantProperty && applicantProperty !== spot.property
+            ? `Applicant building: ${applicantProperty}`
+            : null,
         }),
       });
       
@@ -105,6 +120,7 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess, reserv
       unit_number: '',
       expected_move_in: '',
     });
+    setApplicantProperty(spot?.property || '');
     onOpenChange(false);
   };
 
@@ -131,6 +147,33 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess, reserv
             </div>
           )}
           
+          {applicantPropertyOptions.length > 1 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1">
+                <Home className="h-3 w-3" />
+                Applicant&apos;s Building *
+              </Label>
+              <Select
+                value={applicantProperty}
+                onValueChange={(value) => {
+                  setApplicantProperty(value);
+                  setFormData({ ...formData, unit_number: '' });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select building" />
+                </SelectTrigger>
+                <SelectContent>
+                  {applicantPropertyOptions.map((property) => (
+                    <SelectItem key={property} value={property}>
+                      {property}{property !== spot.property ? ' (shared lot)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="applicant_name" className="flex items-center gap-1">

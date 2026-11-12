@@ -25,6 +25,8 @@ export interface WaitlistEntry {
   internal_notes: string | null;
   is_section_8: boolean;
   extended_retention: boolean;
+  archived_at: string | null;
+  restored_at: string | null;
   last_contacted: string | null;
   nurture_status: NurtureStatus;
   entry_source: EntrySource;

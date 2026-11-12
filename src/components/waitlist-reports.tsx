@@ -1,60 +1,70 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Download, 
-  RefreshCw, 
-  Users, 
-  UserPlus, 
-  Globe, 
-  Target, 
-  Calendar,
-  CheckCircle,
-  FileText,
-  TrendingUp
-} from 'lucide-react';
+import { Download, RefreshCw, UserPlus, Sparkles, CalendarCheck, FileSignature, ChevronRight, X } from 'lucide-react';
+import { getCurrentWeekRange, getPreviousWeekRange, getYTDRange, formatDateRange, type DateRange } from '@/lib/date-utils';
+import type { ReportRecord } from '@/lib/waitlist-report-history';
 
-interface ReportMetrics {
-  totalEntries: number;
-  agentEntries: number;
-  selfEntries: number;
-  matchedCount: number;
-  toursScheduled: number;
-  applied: number;
-  leaseSigned: number;
+interface ReportResponse {
+  records: ReportRecord[];
+  archivedCount: number;
+  deletedCount: number;
 }
 
-interface ReportData {
-  ytd: {
-    label: string;
-    range: string;
-    metrics: ReportMetrics;
+type Period = 'week' | 'lastWeek' | 'month' | 'ytd';
+
+const PERIODS: { key: Period; label: string }[] = [
+  { key: 'week', label: 'This week' },
+  { key: 'lastWeek', label: 'Last week' },
+  { key: 'month', label: 'This month' },
+  { key: 'ytd', label: 'Year to date' },
+];
+
+function getPeriodRange(period: Period): DateRange {
+  if (period === 'week') return getCurrentWeekRange();
+  if (period === 'lastWeek') return getPreviousWeekRange();
+  if (period === 'ytd') return getYTDRange();
+  const now = new Date();
+  return {
+    start: new Date(now.getFullYear(), now.getMonth(), 1),
+    end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999),
   };
-  week: {
-    label: string;
-    range: string;
-    metrics: ReportMetrics;
+}
+
+const inRange = (date: string | null, range: DateRange) => {
+  if (!date) return false;
+  const d = new Date(date);
+  return d >= range.start && d <= range.end;
+};
+
+const OUTCOME_RANK: Record<string, number> = { matched: 1, touring: 2, applied: 3, leased: 4 };
+
+// Furthest stage reached: 1 matched, 2 toured, 3 applied, 4 leased
+function stageReached(r: ReportRecord): number {
+  const fromDates = r.lease_signed_at ? 4 : r.applied_at ? 3 : r.tour_scheduled_at ? 2 : r.matched_at ? 1 : 0;
+  return Math.max(fromDates, OUTCOME_RANK[r.outcome_status || ''] || 0);
+}
+
+function getMetrics(records: ReportRecord[], range: DateRange) {
+  const added = records.filter(r => inRange(r.created_at, range));
+  return {
+    added: added.length,
+    selfAdded: added.filter(r => r.entry_source === 'self').length,
+    matched: records.filter(r => inRange(r.matched_at, range)).length,
+    tours: records.filter(r => inRange(r.tour_scheduled_at, range)).length,
+    applied: records.filter(r => inRange(r.applied_at, range)).length,
+    leased: records.filter(r => inRange(r.lease_signed_at, range)).length,
+    cohort: added,
   };
-  funnel: {
-    active: number;
-    matched: number;
-    touring: number;
-    applied: number;
-    leased: number;
-    declined: number;
-    removed: number;
-  };
-  byProperty: Record<string, { total: number; self: number; agent: number }>;
-  totalEntries: number;
 }
 
 export function WaitlistReports() {
-  const [data, setData] = useState<ReportData | null>(null);
+  const [data, setData] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [period, setPeriod] = useState<Period>('week');
+  const [property, setProperty] = useState<string | null>(null);
 
   const fetchReports = async () => {
     setLoading(true);
@@ -62,8 +72,7 @@ export function WaitlistReports() {
     try {
       const response = await fetch('/api/waitlist/reports');
       if (!response.ok) throw new Error('Failed to fetch reports');
-      const result = await response.json();
-      setData(result);
+      setData(await response.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load reports');
     } finally {
@@ -75,57 +84,77 @@ export function WaitlistReports() {
     fetchReports();
   }, []);
 
-  const exportToCSV = () => {
-    if (!data) return;
+  const range = useMemo(() => getPeriodRange(period), [period]);
+  const records = useMemo(() => data?.records || [], [data]);
+  const properties = useMemo(
+    () => [...new Set(records.map(r => r.property).filter((p): p is string => !!p))].sort(),
+    [records]
+  );
+  const filtered = useMemo(
+    () => (property ? records.filter(r => r.property === property) : records),
+    [records, property]
+  );
+  const metrics = useMemo(() => getMetrics(filtered, range), [filtered, range]);
 
-    const rows = [
+  const funnel = useMemo(() => {
+    const steps = [
+      { label: 'Added', value: metrics.cohort.length },
+      { label: 'Matched', value: metrics.cohort.filter(r => stageReached(r) >= 1).length },
+      { label: 'Toured', value: metrics.cohort.filter(r => stageReached(r) >= 2).length },
+      { label: 'Applied', value: metrics.cohort.filter(r => stageReached(r) >= 3).length },
+      { label: 'Leased', value: metrics.cohort.filter(r => stageReached(r) >= 4).length },
+    ];
+    return {
+      steps,
+      declined: metrics.cohort.filter(r => r.outcome_status === 'declined').length,
+      removed: metrics.cohort.filter(r => r.outcome_status === 'removed').length,
+    };
+  }, [metrics]);
+
+  const propertyStats = useMemo(
+    () =>
+      properties.map(name => {
+        const m = getMetrics(records.filter(r => r.property === name), range);
+        return { name, added: m.added, matched: m.matched, leased: m.leased };
+      }),
+    [properties, records, range]
+  );
+
+  const periodLabel = PERIODS.find(p => p.key === period)!.label;
+
+  const exportToCSV = () => {
+    const rows: (string | number)[][] = [
       ['Waitlist Manager Report'],
       ['Generated', new Date().toLocaleString()],
-      [''],
-      ['YTD METRICS', data.ytd.range],
-      ['Total Entries Added', data.ytd.metrics.totalEntries],
-      ['Agent-Added Entries', data.ytd.metrics.agentEntries],
-      ['Self-Added Entries', data.ytd.metrics.selfEntries],
-      ['Unit Matches', data.ytd.metrics.matchedCount],
-      ['Tours Scheduled', data.ytd.metrics.toursScheduled],
-      ['Applications', data.ytd.metrics.applied],
-      ['Leases Signed', data.ytd.metrics.leaseSigned],
-      [''],
-      ['THIS WEEK', data.week.range],
-      ['Total Entries Added', data.week.metrics.totalEntries],
-      ['Agent-Added Entries', data.week.metrics.agentEntries],
-      ['Self-Added Entries', data.week.metrics.selfEntries],
-      ['Unit Matches', data.week.metrics.matchedCount],
-      ['Tours Scheduled', data.week.metrics.toursScheduled],
-      ['Applications', data.week.metrics.applied],
-      ['Leases Signed', data.week.metrics.leaseSigned],
-      [''],
-      ['FUNNEL STATUS'],
-      ['Active', data.funnel.active],
-      ['Matched', data.funnel.matched],
-      ['Touring', data.funnel.touring],
-      ['Applied', data.funnel.applied],
-      ['Leased', data.funnel.leased],
-      ['Declined', data.funnel.declined],
-      ['Removed', data.funnel.removed],
-      [''],
-      ['BY PROPERTY', 'Total', 'Self-Added', 'Agent-Added'],
-      ...Object.entries(data.byProperty).map(([prop, stats]) => [
-        prop, stats.total, stats.self, stats.agent
-      ]),
+      ['Period', `${periodLabel} (${formatDateRange(range)})`],
+      ['Property', property || 'All properties'],
+      [],
+      ['Entries added', metrics.added],
+      ['Agent-added', metrics.added - metrics.selfAdded],
+      ['Self sign-ups', metrics.selfAdded],
+      ['Unit matches', metrics.matched],
+      ['Tours scheduled', metrics.tours],
+      ['Applications', metrics.applied],
+      ['Leases signed', metrics.leased],
+      [],
+      ['FUNNEL (entries added this period)'],
+      ...funnel.steps.map(s => [s.label, s.value]),
+      ['Declined', funnel.declined],
+      ['Removed', funnel.removed],
+      [],
+      ['BY PROPERTY', 'Added', 'Matched', 'Leased'],
+      ...propertyStats.map(p => [p.name, p.added, p.matched, p.leased]),
     ];
-
-    const csvContent = rows.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
+    const csv = rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = `waitlist-report-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `waitlist-report-${period}-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -136,32 +165,50 @@ export function WaitlistReports() {
 
   if (error || !data) {
     return (
-      <Card className="border-red-200 bg-red-50">
-        <CardContent className="pt-6">
-          <p className="text-red-600">{error || 'Failed to load reports'}</p>
-          <Button variant="outline" onClick={fetchReports} className="mt-2">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Retry
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="rounded-xl border border-red-200 bg-red-50 p-6">
+        <p className="text-red-600">{error || 'No report data'}</p>
+        <Button variant="outline" onClick={fetchReports} className="mt-2">
+          Try Again
+        </Button>
+      </div>
     );
   }
 
+  const cards = [
+    { label: 'Entries added', value: metrics.added, sub: `${metrics.added - metrics.selfAdded} by agents · ${metrics.selfAdded} self sign-up`, icon: UserPlus, tone: 'text-blue-600', iconBg: 'bg-blue-50 dark:bg-blue-950' },
+    { label: 'Unit matches', value: metrics.matched, icon: Sparkles, tone: 'text-green-600', iconBg: 'bg-green-50 dark:bg-green-950' },
+    { label: 'Tours scheduled', value: metrics.tours, sub: `${metrics.applied} application${metrics.applied === 1 ? '' : 's'}`, icon: CalendarCheck, tone: 'text-cyan-600', iconBg: 'bg-cyan-50 dark:bg-cyan-950' },
+    { label: 'Leases signed', value: metrics.leased, icon: FileSignature, tone: 'text-emerald-600', iconBg: 'bg-emerald-50 dark:bg-emerald-950' },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold">Performance Reports</h2>
           <p className="text-sm text-muted-foreground">
-            Weekly period: Friday - Thursday | YTD: Jan 1 - Dec 31
+            {formatDateRange(range)}
+            {period.endsWith('eek') && ' (Fri – Thu)'} · {property || 'All properties'}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchReports} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-lg border bg-white dark:bg-gray-900 p-1 shadow-sm">
+            {PERIODS.map(p => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setPeriod(p.key)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  period === p.key ? 'bg-blue-600 text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchReports} disabled={loading} title="Refresh">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
           <Button size="sm" onClick={exportToCSV}>
             <Download className="h-4 w-4 mr-2" />
@@ -170,232 +217,96 @@ export function WaitlistReports() {
         </div>
       </div>
 
-      {/* YTD Stats */}
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-blue-600" />
-              {data.ytd.label}
-            </CardTitle>
-            <Badge variant="outline">{data.ytd.range}</Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-            <MetricCard 
-              icon={<Users className="h-4 w-4" />}
-              label="Total Entries"
-              value={data.ytd.metrics.totalEntries}
-              color="blue"
-            />
-            <MetricCard 
-              icon={<UserPlus className="h-4 w-4" />}
-              label="Agent Added"
-              value={data.ytd.metrics.agentEntries}
-              color="purple"
-            />
-            <MetricCard 
-              icon={<Globe className="h-4 w-4" />}
-              label="Self Added"
-              value={data.ytd.metrics.selfEntries}
-              color="green"
-            />
-            <MetricCard 
-              icon={<Target className="h-4 w-4" />}
-              label="Matches"
-              value={data.ytd.metrics.matchedCount}
-              color="amber"
-            />
-            <MetricCard 
-              icon={<Calendar className="h-4 w-4" />}
-              label="Tours"
-              value={data.ytd.metrics.toursScheduled}
-              color="cyan"
-            />
-            <MetricCard 
-              icon={<FileText className="h-4 w-4" />}
-              label="Applied"
-              value={data.ytd.metrics.applied}
-              color="orange"
-            />
-            <MetricCard 
-              icon={<CheckCircle className="h-4 w-4" />}
-              label="Leased"
-              value={data.ytd.metrics.leaseSigned}
-              color="emerald"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Weekly Stats */}
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-purple-600" />
-              {data.week.label}
-            </CardTitle>
-            <Badge variant="outline">{data.week.range}</Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-            <MetricCard 
-              icon={<Users className="h-4 w-4" />}
-              label="Total Entries"
-              value={data.week.metrics.totalEntries}
-              color="blue"
-            />
-            <MetricCard 
-              icon={<UserPlus className="h-4 w-4" />}
-              label="Agent Added"
-              value={data.week.metrics.agentEntries}
-              color="purple"
-            />
-            <MetricCard 
-              icon={<Globe className="h-4 w-4" />}
-              label="Self Added"
-              value={data.week.metrics.selfEntries}
-              color="green"
-            />
-            <MetricCard 
-              icon={<Target className="h-4 w-4" />}
-              label="Matches"
-              value={data.week.metrics.matchedCount}
-              color="amber"
-            />
-            <MetricCard 
-              icon={<Calendar className="h-4 w-4" />}
-              label="Tours"
-              value={data.week.metrics.toursScheduled}
-              color="cyan"
-            />
-            <MetricCard 
-              icon={<FileText className="h-4 w-4" />}
-              label="Applied"
-              value={data.week.metrics.applied}
-              color="orange"
-            />
-            <MetricCard 
-              icon={<CheckCircle className="h-4 w-4" />}
-              label="Leased"
-              value={data.week.metrics.leaseSigned}
-              color="emerald"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Funnel Overview */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Current Funnel Status</CardTitle>
-            <CardDescription>All entries by outcome stage</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <FunnelBar label="Active" value={data.funnel.active} total={data.totalEntries} color="bg-blue-500" />
-              <FunnelBar label="Matched" value={data.funnel.matched} total={data.totalEntries} color="bg-amber-500" />
-              <FunnelBar label="Touring" value={data.funnel.touring} total={data.totalEntries} color="bg-cyan-500" />
-              <FunnelBar label="Applied" value={data.funnel.applied} total={data.totalEntries} color="bg-orange-500" />
-              <FunnelBar label="Leased" value={data.funnel.leased} total={data.totalEntries} color="bg-emerald-500" />
-              <FunnelBar label="Declined" value={data.funnel.declined} total={data.totalEntries} color="bg-red-400" />
-              <FunnelBar label="Removed" value={data.funnel.removed} total={data.totalEntries} color="bg-gray-400" />
+      {/* Headline cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {cards.map(card => {
+          const Icon = card.icon;
+          return (
+            <div key={card.label} className="flex items-center gap-4 rounded-xl border bg-white dark:bg-gray-900 p-4 shadow-sm">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${card.iconBg}`}>
+                <Icon className={`h-5 w-5 ${card.tone}`} />
+              </div>
+              <div className="min-w-0">
+                <div className="text-2xl font-semibold tabular-nums leading-tight">{card.value}</div>
+                <div className="text-sm text-muted-foreground">{card.label}</div>
+                {card.sub && <div className="text-xs text-muted-foreground truncate">{card.sub}</div>}
+              </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">By Property</CardTitle>
-            <CardDescription>Entry source breakdown</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-[250px] overflow-y-auto">
-              {Object.entries(data.byProperty)
-                .sort((a, b) => b[1].total - a[1].total)
-                .map(([property, stats]) => (
-                  <div key={property} className="flex items-center justify-between py-1 border-b last:border-0">
-                    <span className="font-medium text-sm">{property}</span>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">
-                        {stats.total} total
-                      </Badge>
-                      <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
-                        {stats.agent} agent
-                      </Badge>
-                      <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
-                        {stats.self} self
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </CardContent>
-        </Card>
+          );
+        })}
       </div>
-    </div>
-  );
-}
 
-function MetricCard({ 
-  icon, 
-  label, 
-  value, 
-  color 
-}: { 
-  icon: React.ReactNode; 
-  label: string; 
-  value: number; 
-  color: string;
-}) {
-  const colorClasses: Record<string, string> = {
-    blue: 'bg-blue-50 text-blue-700 border-blue-200',
-    purple: 'bg-purple-50 text-purple-700 border-purple-200',
-    green: 'bg-green-50 text-green-700 border-green-200',
-    amber: 'bg-amber-50 text-amber-700 border-amber-200',
-    cyan: 'bg-cyan-50 text-cyan-700 border-cyan-200',
-    orange: 'bg-orange-50 text-orange-700 border-orange-200',
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  };
-
-  return (
-    <div className={`p-3 rounded-lg border ${colorClasses[color]}`}>
-      <div className="flex items-center gap-2 mb-1">
-        {icon}
-        <span className="text-xs font-medium">{label}</span>
+      {/* Funnel */}
+      <div className="rounded-xl border bg-white dark:bg-gray-900 p-4 shadow-sm">
+        <div className="mb-3">
+          <h3 className="font-semibold">Funnel</h3>
+          <p className="text-sm text-muted-foreground">How far the people added {periodLabel.toLowerCase()} have progressed</p>
+        </div>
+        <div className="flex flex-wrap items-stretch gap-2">
+          {funnel.steps.map((step, i) => {
+            const prev = i > 0 ? funnel.steps[i - 1].value : 0;
+            const pct = i > 0 && prev > 0 ? Math.round((step.value / prev) * 100) : null;
+            return (
+              <div key={step.label} className="flex flex-1 items-center gap-2 min-w-[120px]">
+                {i > 0 && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                <div className="flex flex-1 flex-col items-center rounded-lg bg-gray-50 dark:bg-gray-800 px-3 py-3 text-center">
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{step.label}</span>
+                  <span className="mt-1 text-2xl font-bold tabular-nums">{step.value}</span>
+                  <span className="text-xs text-muted-foreground">{i === 0 ? 'people' : pct === null ? '–' : `${pct}% of ${funnel.steps[i - 1].label.toLowerCase()}`}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {(funnel.declined > 0 || funnel.removed > 0) && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            {funnel.declined} declined · {funnel.removed} removed
+          </p>
+        )}
       </div>
-      <div className="text-2xl font-bold">{value}</div>
-    </div>
-  );
-}
 
-function FunnelBar({ 
-  label, 
-  value, 
-  total, 
-  color 
-}: { 
-  label: string; 
-  value: number; 
-  total: number; 
-  color: string;
-}) {
-  const percentage = total > 0 ? (value / total) * 100 : 0;
-  
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-sm w-20">{label}</span>
-      <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
-        <div 
-          className={`h-full ${color} transition-all`}
-          style={{ width: `${Math.max(percentage, 0)}%` }}
-        />
+      {/* Property tiles */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="font-semibold">By property</h3>
+          {property && (
+            <Button variant="ghost" size="sm" onClick={() => setProperty(null)}>
+              <X className="h-4 w-4 mr-1" />
+              Show all properties
+            </Button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+          {propertyStats.map(p => {
+            const active = property === p.name;
+            return (
+              <button
+                key={p.name}
+                type="button"
+                onClick={() => setProperty(active ? null : p.name)}
+                className={`flex flex-col items-center rounded-xl border px-3 py-4 text-center shadow-sm transition-all ${
+                  active
+                    ? 'border-blue-600 bg-blue-600 text-white shadow-md'
+                    : 'bg-white dark:bg-gray-900 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md'
+                }`}
+              >
+                <span className="text-sm font-medium leading-tight">{p.name}</span>
+                <span className={`mt-2 text-3xl font-bold tabular-nums leading-none ${active ? 'text-white' : 'text-gray-900 dark:text-gray-50'}`}>
+                  {p.added}
+                </span>
+                <span className={`mt-1 text-xs ${active ? 'text-blue-100' : 'text-muted-foreground'}`}>added</span>
+                <span className={`mt-2 text-xs ${active ? 'text-blue-100' : 'text-muted-foreground'}`}>
+                  {p.matched} matched · {p.leased} leased
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
-      <span className="text-sm font-medium w-12 text-right">{value}</span>
+
+      <p className="text-xs text-muted-foreground">
+        Includes {data.archivedCount} archived and {data.deletedCount} permanently deleted entr{data.deletedCount === 1 ? 'y' : 'ies'}.
+      </p>
     </div>
   );
 }

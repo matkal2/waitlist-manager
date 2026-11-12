@@ -22,6 +22,7 @@ import {
 import { Plus, Eye, Zap, Accessibility, Search, X, User, Car } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PROPERTY_UNITS } from '@/lib/property-units';
+import { getAllowedParkingProperties } from '@/lib/properties';
 
 interface ParkingSpot {
   id: string;
@@ -60,6 +61,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showInventoryPreview, setShowInventoryPreview] = useState(false);
+  const [previewProperty, setPreviewProperty] = useState('');
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   // Form state
@@ -218,6 +220,13 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
       })
     : [];
 
+  // Parking properties this tenant may use (own property first, then shared lots)
+  const allowedParkingProperties = getAllowedParkingProperties(selectedProperty);
+  const propertyRank = (property: string) => allowedParkingProperties.indexOf(property);
+  const inventoryProperty = previewProperty && allowedParkingProperties.includes(previewProperty)
+    ? previewProperty
+    : selectedProperty;
+
   // Check if a spot is available by the effective date
   const isSpotAvailableByDate = (spot: ParkingSpot) => {
     // If no effective date selected, show all eligible spots
@@ -241,7 +250,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
   const getPrimarySpots = () => {
     return spots
       .filter(spot => {
-        if (spot.property !== selectedProperty) return false;
+        if (!allowedParkingProperties.includes(spot.property)) return false;
         
         if (changeType === 'Termination') {
           // Termination: Show spots that have tenants (Occupied, Notice, Future)
@@ -267,6 +276,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
         return {
           value: spot.full_space_code,
           label: spot.full_space_code,
+          property: spot.property,
           spotNumber: parseInt(spotNum.replace(/\D/g, '')) || 0,
           status: spot.status,
           tenant: spot.tenant_code,
@@ -274,14 +284,14 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
           terminationDate: spot.termination_date,
         };
       })
-      .sort((a, b) => a.spotNumber - b.spotNumber);
+      .sort((a, b) => propertyRank(a.property) - propertyRank(b.property) || a.spotNumber - b.spotNumber);
   };
 
   // For Transfer: Get Vacant + Notice spots for "Transfer To" dropdown (filtered by effective date)
   const getTransferToSpots = () => {
     return spots
       .filter(spot => {
-        if (spot.property !== selectedProperty) return false;
+        if (!allowedParkingProperties.includes(spot.property)) return false;
         // Exclude Reserved spots - they are held for applicants in screening
         if (spot.status === 'Reserved') return false;
         // Also exclude Notice spots that have a reservation
@@ -297,13 +307,14 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
         return {
           value: spot.full_space_code,
           label: spot.full_space_code,
+          property: spot.property,
           spotNumber: parseInt(spotNum.replace(/\D/g, '')) || 0,
           status: spot.status,
           availableDate: spot.available_date,
           terminationDate: spot.termination_date,
         };
       })
-      .sort((a, b) => a.spotNumber - b.spotNumber);
+      .sort((a, b) => propertyRank(a.property) - propertyRank(b.property) || a.spotNumber - b.spotNumber);
   };
 
   const availableParkingSpots = getPrimarySpots();
@@ -602,7 +613,8 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                         type="button"
                         onClick={() => {
                           setPrimarySpace(spot.full_space_code);
-                          setSelectedProperty(spot.property);
+                          // Keep the tenant's own property (a 546 resident may hold a shared 440 spot)
+                          if (!selectedProperty) setSelectedProperty(spot.property);
                           setValidationErrors(prev => ({ ...prev, primarySpace: '', property: '' }));
                         }}
                         className={`px-2 py-1 rounded border text-xs font-medium transition-all ${
@@ -731,7 +743,10 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                       variant="ghost"
                       size="sm"
                       className="h-6 px-2 text-xs"
-                      onClick={() => setShowInventoryPreview(true)}
+                      onClick={() => {
+                        setPreviewProperty(selectedProperty);
+                        setShowInventoryPreview(true);
+                      }}
                     >
                       <Eye className="h-3 w-3 mr-1" />
                       Preview Inventory
@@ -756,6 +771,11 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                       <SelectItem key={spot.value} value={spot.label}>
                         <div className="flex items-center gap-2">
                           <span>{spot.label}</span>
+                          {spot.property !== selectedProperty && (
+                            <Badge variant="outline" className="text-xs bg-sky-50 text-sky-700 border-sky-200">
+                              Shared lot
+                            </Badge>
+                          )}
                           {spot.status === 'Notice' && (
                             <Badge variant="outline" className="text-xs bg-orange-50 text-orange-600 border-orange-200">
                               Available {spot.availableDate ? new Date(spot.availableDate).toLocaleDateString() : ''}
@@ -799,9 +819,24 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
           <Dialog open={showInventoryPreview} onOpenChange={setShowInventoryPreview}>
             <DialogContent className="w-[90vw] max-w-[90vw] max-h-[80vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Parking Inventory - {selectedProperty}</DialogTitle>
+                <DialogTitle>Parking Inventory - {inventoryProperty}</DialogTitle>
               </DialogHeader>
               <div className="space-y-2">
+                {allowedParkingProperties.length > 1 && (
+                  <div className="flex gap-2">
+                    {allowedParkingProperties.map(property => (
+                      <Button
+                        key={property}
+                        type="button"
+                        size="sm"
+                        variant={inventoryProperty === property ? 'default' : 'outline'}
+                        onClick={() => setPreviewProperty(property)}
+                      >
+                        {property}{property !== selectedProperty ? ' (shared lot)' : ''}
+                      </Button>
+                    ))}
+                  </div>
+                )}
                 <div className="flex gap-2 text-xs mb-3">
                   <Badge className="bg-green-500 text-white">Vacant</Badge>
                   <Badge className="bg-red-500 text-white">Occupied</Badge>
@@ -824,7 +859,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                     </thead>
                     <tbody>
                       {spots
-                        .filter(spot => spot.property === selectedProperty)
+                        .filter(spot => spot.property === inventoryProperty)
                         .sort((a, b) => {
                           const numA = parseInt((a.spot_number || '').replace(/\D/g, '')) || 0;
                           const numB = parseInt((b.spot_number || '').replace(/\D/g, '')) || 0;
@@ -897,16 +932,16 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                 </div>
                 <div className="flex gap-4 text-xs text-muted-foreground pt-2">
                   <span className="text-green-600 font-medium">
-                    {spots.filter(s => s.property === selectedProperty && s.status === 'Vacant').length} vacant
+                    {spots.filter(s => s.property === inventoryProperty && s.status === 'Vacant').length} vacant
                   </span>
                   <span className="text-orange-500 font-medium">
-                    {spots.filter(s => s.property === selectedProperty && s.status === 'Notice').length} on notice
+                    {spots.filter(s => s.property === inventoryProperty && s.status === 'Notice').length} on notice
                   </span>
                   <span className="text-gray-700 font-medium">
-                    {spots.filter(s => s.property === selectedProperty && s.status === 'Future').length} future
+                    {spots.filter(s => s.property === inventoryProperty && s.status === 'Future').length} future
                   </span>
                   <span>
-                    {spots.filter(s => s.property === selectedProperty).length} total spots
+                    {spots.filter(s => s.property === inventoryProperty).length} total spots
                   </span>
                 </div>
               </div>
@@ -930,6 +965,11 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                     <SelectItem key={spot.value} value={spot.label}>
                       <div className="flex items-center gap-2">
                         <span>{spot.label}</span>
+                        {spot.property !== selectedProperty && (
+                          <Badge variant="outline" className="text-xs bg-sky-50 text-sky-700 border-sky-200">
+                            Shared lot
+                          </Badge>
+                        )}
                         {spot.status === 'Notice' && (
                           <Badge variant="outline" className="text-xs bg-orange-50 text-orange-600 border-orange-200">
                             Available {spot.availableDate ? new Date(spot.availableDate).toLocaleDateString() : ''}

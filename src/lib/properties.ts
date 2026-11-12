@@ -31,6 +31,22 @@ export const PROPERTIES = [
   { name: 'HIGHPOINT Albany Park on Montrose', nickname: 'W. Montrose' },
 ] as const;
 
+// One-way shared parking: residents of the key property may also park at the listed properties.
+// Residents of the listed properties are NOT allowed to park at the key property.
+export const SHARED_PARKING: Record<string, string[]> = {
+  'Green Bay 546': ['Green Bay 440'],
+};
+
+// Parking properties a resident of `property` may use, own property first
+export const getAllowedParkingProperties = (property: string): string[] =>
+  property ? [property, ...(SHARED_PARKING[property] || [])] : [];
+
+// Properties whose residents may also use parking at `parkingProperty` (excluding itself)
+export const getSharedResidentProperties = (parkingProperty: string): string[] =>
+  Object.entries(SHARED_PARKING)
+    .filter(([, lots]) => lots.includes(parkingProperty))
+    .map(([resident]) => resident);
+
 // Helper functions (static - for backward compatibility)
 export const getPropertyNames = () => PROPERTIES.map(p => p.name);
 export const getPropertyNicknames = () => PROPERTIES.map(p => p.nickname);

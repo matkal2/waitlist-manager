@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { CLOSED_OUTCOMES, normalizePropertyName } from '@/lib/waitlist-matching';
 import { WaitlistEntry } from '@/types/database';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -88,7 +89,7 @@ export function SheetsMatchAlerts({ units, waitlistEntries, onMatchCountChange, 
   };
 
   const findMatches = (): Match[] => {
-    const activeEntries = waitlistEntries.filter(e => e.status === 'Active');
+    const activeEntries = waitlistEntries.filter(e => e.status === 'Active' && !CLOSED_OUTCOMES.includes(e.outcome_status || ''));
     const matches: Match[] = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -161,7 +162,7 @@ export function SheetsMatchAlerts({ units, waitlistEntries, onMatchCountChange, 
           // ===== MANDATORY MATCHES =====
           
           // Match by property (required)
-          if (entry.property !== unit.property) return false;
+          if (normalizePropertyName(entry.property) !== normalizePropertyName(unit.property)) return false;
           
           // Match by unit type (required) - supports multiple unit types (comma-separated)
           const entryUnitTypes = entry.unit_type_pref.split(',').map(t => t.trim());
@@ -220,56 +221,30 @@ export function SheetsMatchAlerts({ units, waitlistEntries, onMatchCountChange, 
     setSendingNotifications(prev => [...prev, unit.unique_id]);
     
     try {
-      // Group entries by agent
-      const entriesByAgent: Record<string, WaitlistEntry[]> = {};
-      entries.forEach(e => {
-        const agent = e.assigned_agent || 'Unassigned';
-        if (!entriesByAgent[agent]) entriesByAgent[agent] = [];
-        entriesByAgent[agent].push(e);
+      // The server emails each assigned agent; unassigned entries go to the leasing inbox
+      const response = await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          unit: {
+            property: unit.property,
+            unit_number: unit.unit_number,
+            unit_type: unit.unit_type,
+            rent_price: unit.rent_price,
+            available_date: unit.available_date || null,
+            unique_id: unit.unique_id,
+          },
+          entryIds: entries.map(e => e.id),
+        }),
       });
 
-      const results: string[] = [];
-      
-      for (const [agent, agentEntries] of Object.entries(entriesByAgent)) {
-        if (agent === 'Unassigned') continue; // Skip unassigned entries
-        
-        const response = await fetch('/api/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            unit: {
-              property: unit.property,
-              unit_number: unit.unit_number,
-              unit_type: unit.unit_type,
-              rent_price: unit.rent_price,
-              available_date: unit.available_date || new Date().toISOString(),
-            },
-            agent,
-            contacts: agentEntries.map(e => ({
-              name: e.full_name,
-              email: e.email,
-              phone: e.phone,
-              entry_type: e.entry_type,
-              budget: e.max_budget,
-              move_in_date: e.move_in_date,
-            })),
-          }),
-        });
+      const result: { error?: string; results?: { agent: string; people: number; success: boolean; error?: string }[] } = await response.json();
+      if (!result.results) throw new Error(result.error || 'Failed to send');
 
-        const result = await response.json();
-        
-        if (response.ok) {
-          results.push(`✓ ${agent}: ${result.contactCount} contacts`);
-        } else {
-          results.push(`✗ ${agent}: ${result.error}`);
-        }
-      }
-
-      if (results.length > 0) {
-        alert(`Notifications sent:\n\n${results.join('\n')}`);
-      } else {
-        alert('No assigned agents found for these entries.');
-      }
+      const lines = result.results.map(r =>
+        r.success ? `✓ ${r.agent}: ${r.people} ${r.people === 1 ? 'person' : 'people'}` : `✗ ${r.agent}: ${r.error}`
+      );
+      alert(`Notifications sent:\n\n${lines.join('\n')}`);
     } catch (error) {
       console.error('Error sending notifications:', error);
       alert('Failed to send notifications. Please try again.');
