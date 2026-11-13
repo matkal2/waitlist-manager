@@ -30,15 +30,18 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, Pencil, Search, Download, X, User, Users, Car, Warehouse, ParkingCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Pencil, Search, Download, X, User, Users, Car, Warehouse, ParkingCircle, ChevronDown, ChevronRight, Sparkles, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PROPERTY_UNITS } from '@/lib/property-units';
+import { MatchableSpot, entryMatchesSpot, getSpotMatches, isSpotOpenForWaitlist, normalizePersonName } from '@/lib/parking-matching';
 
 interface ParkingWaitlistTableProps {
   entries: ParkingWaitlist[];
   properties: string[];
   onRefresh: () => void;
   currentUserEmail?: string;
+  spots?: MatchableSpot[];
+  submitterName?: string;
 }
 
 const WAITLIST_TYPES: { value: ParkingWaitlistType; label: string; priority: number }[] = [
@@ -69,7 +72,13 @@ const formatDateLocal = (dateString: string) => {
   return date.toLocaleDateString();
 };
 
-export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUserEmail }: ParkingWaitlistTableProps) {
+export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUserEmail, spots = [], submitterName = 'Unknown' }: ParkingWaitlistTableProps) {
+  const [notInDirectoryOnly, setNotInDirectoryOnly] = useState(false);
+  const [directoryLoaded, setDirectoryLoaded] = useState(false);
+  const [assignTarget, setAssignTarget] = useState<{ entry: ParkingWaitlist; spot: MatchableSpot } | null>(null);
+  const [assignFromSpot, setAssignFromSpot] = useState('');
+  const [assignDate, setAssignDate] = useState('');
+  const [isAssigning, setIsAssigning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('Active');
@@ -110,19 +119,104 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
     return PROPERTY_UNITS[key] || [];
   };
 
-  // Fetch directory when dialog opens
+  // Directory feeds tenant autocomplete and the "Not in Directory" check
   useEffect(() => {
-    if (isAddDialogOpen && directory.length === 0) {
-      setIsLoadingDirectory(true);
-      fetch('/api/directory')
-        .then(res => res.json())
-        .then(data => {
-          setDirectory(data.directory || []);
-        })
-        .catch(err => console.error('Failed to load directory:', err))
-        .finally(() => setIsLoadingDirectory(false));
+    setIsLoadingDirectory(true);
+    fetch('/api/directory')
+      .then(res => res.json())
+      .then(data => {
+        const list = data.directory || [];
+        setDirectory(list);
+        setDirectoryLoaded(list.length > 0);
+      })
+      .catch(err => console.error('Failed to load directory:', err))
+      .finally(() => setIsLoadingDirectory(false));
+  }, []);
+
+  const directoryNames = new Set(directory.map(d => normalizePersonName(d.residentName)));
+  const isMissingFromDirectory = (entry: ParkingWaitlist) =>
+    directoryLoaded &&
+    (entry.status === 'Active' || entry.status === 'Offered') &&
+    !directoryNames.has(normalizePersonName(entry.tenant_name));
+  const missingCount = entries.filter(isMissingFromDirectory).length;
+
+  const openSpots = spots.filter(isSpotOpenForWaitlist);
+  const getEntryMatches = (entry: ParkingWaitlist) =>
+    openSpots
+      .filter(spot => entryMatchesSpot(entry, spot))
+      .map(spot => ({ spot, rank: getSpotMatches(spot, entries).findIndex(e => e.id === entry.id) + 1 }))
+      .sort((a, b) =>
+        (a.spot.status === 'Vacant' ? 0 : 1) - (b.spot.status === 'Vacant' ? 0 : 1) ||
+        a.rank - b.rank ||
+        new Date(a.spot.available_date || 0).getTime() - new Date(b.spot.available_date || 0).getTime()
+      );
+
+  const resolveSpotCode = (entry: ParkingWaitlist, value: string | null) => {
+    if (!value) return '';
+    const v = value.trim().toLowerCase();
+    const found = spots.find(s => s.full_space_code.toLowerCase() === v) ||
+      spots.find(s => s.property === entry.property && (s.spot_number || '').toLowerCase() === v);
+    return found ? found.full_space_code : value.trim();
+  };
+
+  const openAssignDialog = (entry: ParkingWaitlist, spot: MatchableSpot) => {
+    const today = new Date().toISOString().split('T')[0];
+    const available = spot.status === 'Vacant' ? today : (spot.available_date || today).split('T')[0];
+    setAssignTarget({ entry, spot });
+    setAssignFromSpot(entry.waitlist_type === 'Indoor Upgrade' ? resolveSpotCode(entry, entry.current_spot_number) : '');
+    setAssignDate(available < today ? today : available);
+  };
+
+  const handleAssign = async () => {
+    if (!assignTarget) return;
+    const { entry, spot } = assignTarget;
+    const isTransfer = entry.waitlist_type === 'Indoor Upgrade';
+    if (isTransfer && !assignFromSpot.trim()) {
+      alert('Enter the spot they are moving from.');
+      return;
     }
-  }, [isAddDialogOpen, directory.length]);
+    if (!assignDate) {
+      alert('Pick an effective date.');
+      return;
+    }
+    setIsAssigning(true);
+    try {
+      const tenant = directory.find(d => normalizePersonName(d.residentName) === normalizePersonName(entry.tenant_name));
+      const response = await fetch('/api/parking/change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: isTransfer ? 'Transfer' : 'Add',
+          tenantName: entry.tenant_name,
+          tenantCode: tenant?.tenantCode || '',
+          tenantUnit: entry.unit_number,
+          property: entry.property,
+          effectiveDate: assignDate,
+          primarySpace: isTransfer ? assignFromSpot.trim() : spot.full_space_code,
+          transferToSpace: isTransfer ? spot.full_space_code : '',
+          submitter: submitterName,
+          otherNotes: `Assigned from parking waitlist (${entry.waitlist_type})`,
+          date: new Date().toLocaleDateString('en-US'),
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to submit change');
+
+      const { error } = await supabase
+        .from('parking_waitlist')
+        .update({ status: 'Assigned' })
+        .eq('id', entry.id);
+      if (error) {
+        alert(`The ${isTransfer ? 'transfer' : 'add'} was submitted, but the waitlist entry could not be marked Assigned: ${error.message}`);
+      }
+      setAssignTarget(null);
+      onRefresh();
+    } catch (error) {
+      alert(`Failed to assign spot: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsAssigning(false);
+    }
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -261,6 +355,20 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
+
+    const duplicate = entries.find(e =>
+      e.id !== editingEntry?.id &&
+      (e.status === 'Active' || e.status === 'Offered') &&
+      normalizePersonName(e.tenant_name) === normalizePersonName(formData.tenant_name) &&
+      e.unit_number === formData.unit_number &&
+      e.waitlist_type === formData.waitlist_type
+    );
+    if (duplicate) {
+      setFormErrors({
+        tenant_name: `${duplicate.tenant_name} is already on the ${duplicate.waitlist_type} waitlist (added ${formatDateLocal(duplicate.created_at)}, ${duplicate.status}).`,
+      });
+      return;
+    }
     
     setIsSubmitting(true);
     
@@ -438,6 +546,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
     .filter(entry => {
       if (typeFilter !== 'all' && entry.waitlist_type !== typeFilter) return false;
       if (statusFilter !== 'all' && entry.status !== statusFilter) return false;
+      if (notInDirectoryOnly && !isMissingFromDirectory(entry)) return false;
       if (searchTerm) {
         const query = searchTerm.toLowerCase();
         return (
@@ -480,7 +589,9 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
   const daysWaiting = (createdAt: string) =>
     Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000));
 
-  const hasFilters = searchTerm !== '' || typeFilter !== 'all' || statusFilter !== 'Active';
+  const hasFilters = searchTerm !== '' || typeFilter !== 'all' || statusFilter !== 'Active' || notInDirectoryOnly;
+
+  const matchCounts = new Map(entries.filter(e => e.status === 'Active').map(e => [e.id, getEntryMatches(e).length]));
 
   const renderList = (list: ParkingWaitlist[], showProperty = false) => (
     <div className="overflow-x-auto rounded-xl border bg-white dark:bg-gray-900 shadow-sm">
@@ -521,7 +632,21 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                     <div className="flex items-center gap-2">
                       {expanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                       <div>
-                        <div className="font-medium">{entry.tenant_name}</div>
+                        <div className="flex flex-wrap items-center gap-1.5 font-medium">
+                          {entry.tenant_name}
+                          {matchCounts.get(entry.id) ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-950 dark:text-green-300">
+                              <Sparkles className="h-3 w-3" />
+                              {matchCounts.get(entry.id)} {matchCounts.get(entry.id) === 1 ? 'match' : 'matches'}
+                            </span>
+                          ) : null}
+                          {isMissingFromDirectory(entry) && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800" title="Name not found in the Directory; they may have moved out">
+                              <AlertTriangle className="h-3 w-3" />
+                              Not in Directory
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           {showProperty && <span className="mr-1 rounded bg-muted px-1.5 py-0.5">{entry.property}</span>}
                           Unit {entry.unit_number}
@@ -573,6 +698,49 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                         <div className="col-span-2 md:col-span-4">
                           <div className="text-xs text-muted-foreground">Notes</div>
                           <div className="whitespace-pre-wrap break-words">{entry.notes || 'No notes'}</div>
+                        </div>
+                        <div className="col-span-2 md:col-span-4 rounded-lg border bg-white dark:bg-gray-900 p-3">
+                          <div className="mb-2 flex items-center justify-between">
+                            <div className="text-sm font-medium">Matching spots</div>
+                            <Button variant="outline" size="sm" className="h-7 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => handleDelete(entry.id)}>
+                              <Trash2 className="h-3.5 w-3.5 mr-1" />
+                              Remove from waitlist
+                            </Button>
+                          </div>
+                          {entry.status !== 'Active' ? (
+                            <div className="text-sm text-muted-foreground">Only Active entries are matched to spots.</div>
+                          ) : (() => {
+                            const matches = getEntryMatches(entry);
+                            if (matches.length === 0) {
+                              return <div className="text-sm text-muted-foreground">No open or upcoming spots match right now.</div>;
+                            }
+                            return (
+                              <div className="divide-y">
+                                {matches.slice(0, 6).map(({ spot, rank }) => (
+                                  <div key={spot.full_space_code} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                                    <span className="font-medium">{spot.full_space_code}</span>
+                                    {spot.spot_type && <span className="text-xs text-muted-foreground">{spot.spot_type}</span>}
+                                    {spot.property !== entry.property && (
+                                      <Badge variant="outline" className="text-xs bg-sky-50 text-sky-700 border-sky-200">Shared lot</Badge>
+                                    )}
+                                    <span className={`text-xs ${spot.status === 'Vacant' ? 'text-green-700' : 'text-orange-600'}`}>
+                                      {spot.status === 'Vacant' ? 'Available now' : `Available ${spot.available_date ? formatDateLocal(spot.available_date) : 'soon'}`}
+                                    </span>
+                                    <span className={`text-xs ${rank === 1 ? 'font-medium text-green-700' : 'text-muted-foreground'}`}>
+                                      {rank === 1 ? 'First in line' : `#${rank} in line`}
+                                    </span>
+                                    <Button size="sm" className="ml-auto h-7" onClick={() => openAssignDialog(entry, spot)}>
+                                      <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                                      Assign
+                                    </Button>
+                                  </div>
+                                ))}
+                                {matches.length > 6 && (
+                                  <div className="pt-2 text-xs text-muted-foreground">+{matches.length - 6} more matching spots</div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     </TableCell>
@@ -943,8 +1111,19 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
             ))}
           </SelectContent>
         </Select>
+        {missingCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setNotInDirectoryOnly(v => !v)}
+            className={`rounded-full border px-3 py-1 text-sm transition ${notInDirectoryOnly ? 'border-amber-600 bg-amber-600 text-white' : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'}`}
+            title="Active entries whose name isn't in the Directory (moved out or name mismatch)"
+          >
+            <AlertTriangle className="mr-1 inline h-3.5 w-3.5" />
+            Not in Directory ({missingCount})
+          </button>
+        )}
         {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={() => { setSearchTerm(''); setTypeFilter('all'); setStatusFilter('Active'); }}>
+          <Button variant="ghost" size="sm" onClick={() => { setSearchTerm(''); setTypeFilter('all'); setStatusFilter('Active'); setNotInDirectoryOnly(false); }}>
             <X className="h-4 w-4 mr-1" />
             Clear
           </Button>
@@ -1024,6 +1203,40 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
           Select a property above to see its parking waitlist, or search by name.
         </div>
       )}
+
+      {/* Assign matched spot */}
+      <Dialog open={!!assignTarget} onOpenChange={(open) => !open && setAssignTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign {assignTarget?.spot.full_space_code}</DialogTitle>
+          </DialogHeader>
+          {assignTarget && (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">
+                This submits {assignTarget.entry.waitlist_type === 'Indoor Upgrade' ? 'a Transfer' : 'an Add'} request to the parking sheet for{' '}
+                <span className="font-medium text-foreground">{assignTarget.entry.tenant_name}</span> ({assignTarget.entry.property}, Unit {assignTarget.entry.unit_number})
+                {' '}and marks their waitlist entry Assigned.
+              </p>
+              {assignTarget.entry.waitlist_type === 'Indoor Upgrade' && (
+                <div className="space-y-1">
+                  <Label htmlFor="assign-from">Moving from spot *</Label>
+                  <Input id="assign-from" value={assignFromSpot} onChange={(e) => setAssignFromSpot(e.target.value)} placeholder="e.g. Green Bay 440 12" />
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label htmlFor="assign-date">Effective date *</Label>
+                <Input id="assign-date" type="date" value={assignDate} onChange={(e) => setAssignDate(e.target.value)} />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setAssignTarget(null)} disabled={isAssigning}>Cancel</Button>
+                <Button onClick={handleAssign} disabled={isAssigning}>
+                  {isAssigning ? 'Submitting...' : 'Assign spot'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

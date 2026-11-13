@@ -25,9 +25,9 @@ import { ParkingChangeForm } from '@/components/parking-change-form';
 import { ParkingReserveForm } from '@/components/parking-reserve-form';
 import { ParkingReservationMatches } from '@/components/parking-reservation-matches';
 import { ParkingWaitlistTable } from '@/components/parking-waitlist-table';
+import { getSpotMatches } from '@/lib/parking-matching';
 import { exportParkingToPDF } from '@/lib/pdf-export';
 import { permissions } from '@/lib/permissions';
-import { getSharedResidentProperties } from '@/lib/properties';
 
 interface ParkingSpot {
   id: string;
@@ -1228,6 +1228,8 @@ export default function ParkingPage() {
                     properties={properties}
                     onRefresh={fetchData}
                     currentUserEmail={user?.email}
+                    spots={spots}
+                    submitterName={userFullName || user?.email || 'Unknown'}
                   />
                 )}
               </CardContent>
@@ -1506,21 +1508,8 @@ export default function ParkingPage() {
                   });
 
                   // Get waitlist matches for a spot
-                  // Own-property residents first, then residents of properties sharing this lot
-                  const getWaitlistMatches = (spot: ParkingSpot) => {
-                    const residentProperties = [spot.property, ...getSharedResidentProperties(spot.property)];
-                    return waitlist
-                      .filter(w => 
-                        w.status === 'Active' && 
-                        residentProperties.includes(w.property) &&
-                        (w.waitlist_type === '1st Spot' || 
-                         (w.waitlist_type === 'Indoor Upgrade' && spot.spot_type === 'Indoor'))
-                      )
-                      .sort((a, b) =>
-                        residentProperties.indexOf(a.property) - residentProperties.indexOf(b.property) ||
-                        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-                      );
-                  };
+                  // Own-property residents first, then shared-lot residents; type priority, then oldest first
+                  const getWaitlistMatches = (spot: ParkingSpot) => getSpotMatches(spot, waitlist);
 
                   if (allUpcomingSpots.length === 0) {
                     return (
