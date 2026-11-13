@@ -50,6 +50,12 @@ const WAITLIST_TYPES: { value: ParkingWaitlistType; label: string; priority: num
   { value: '2nd Spot', label: '2nd Spot', priority: 3 },
 ];
 
+const TYPE_DESCRIPTIONS: Record<string, string> = {
+  '1st Spot': 'Resident has no parking yet',
+  'Indoor Upgrade': 'Move from an outdoor spot to indoor',
+  '2nd Spot': 'Resident wants an additional spot',
+};
+
 const STATUSES: ParkingWaitlistStatus[] = ['Active', 'Offered', 'Assigned', 'Cancelled'];
 
 const STATUS_COLORS: Record<ParkingWaitlistStatus, string> = {
@@ -345,7 +351,12 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
       notes: entry.notes || '',
     });
     setTenantSearch(entry.tenant_name);
-    setSelectedTenantCode('');
+    setSelectedTenantCode(
+      directory.find(d =>
+        normalizePersonName(d.residentName) === normalizePersonName(entry.tenant_name) &&
+        (!d.unitNumber || d.unitNumber === entry.unit_number)
+      )?.tenantCode || ''
+    );
     setFormErrors({});
     setIsAddDialogOpen(true);
   };
@@ -395,7 +406,13 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
         phone: formData.phone.trim() || null,
         property: formData.property,
         waitlist_type: formData.waitlist_type,
-        current_spot_number: formData.current_spot_number.trim() || null,
+        current_spot_number: (() => {
+          if (formData.waitlist_type === '1st Spot') return null;
+          if (selectedTenantSpots.length > 0 && formData.waitlist_type !== 'Indoor Upgrade') {
+            return selectedTenantSpots.map(sp => sp.full_space_code).join(', ');
+          }
+          return formData.current_spot_number.trim() || null;
+        })(),
         preferred_spot_type: formData.preferred_spot_type === 'Any' ? null : formData.preferred_spot_type,
         status: formData.status,
         notes: formData.notes.trim() || null,
@@ -811,13 +828,13 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                 Add to Waitlist
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
-                {editingEntry ? 'Edit Waitlist Entry' : 'Add to Parking Waitlist'}
+                {editingEntry ? 'Edit Parking Waitlist Entry' : 'New Parking Waitlist Entry'}
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 pt-4">
+            <div className="space-y-4">
               {/* Tenant Name - Autocomplete from Directory */}
               <div className="relative">
                 <Label>Tenant Name *</Label>
@@ -910,10 +927,64 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                     Start typing to search the resident directory
                   </p>
                 )}
+                {/* Resident's current parking, from inventory */}
+                {selectedTenantCode && selectedTenantSpots.length > 0 && (
+                  <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-md">
+                    <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                      <Car className="h-4 w-4" />
+                      <span className="text-sm font-medium">
+                        {formData.waitlist_type === 'Indoor Upgrade'
+                          ? 'Select the spot to upgrade from:'
+                          : `Current parking (${selectedTenantSpots.length} spot${selectedTenantSpots.length > 1 ? 's' : ''}):`}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {selectedTenantSpots.map(sp => {
+                        const label = `${sp.spot_type ? `${sp.spot_type}, ` : ''}${sp.future_tenant_code === selectedTenantCode && sp.tenant_code !== selectedTenantCode ? 'Future' : sp.status}`;
+                        const selectable = formData.waitlist_type === 'Indoor Upgrade' && !isIndoorSpot(sp);
+                        const picked = selectable && formData.current_spot_number === sp.full_space_code;
+                        return selectable ? (
+                          <button
+                            key={sp.full_space_code}
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({ ...prev, current_spot_number: sp.full_space_code }));
+                              setFormErrors(prev => ({ ...prev, current_spot_number: '' }));
+                            }}
+                            className={`px-2 py-1 rounded border text-xs font-medium transition-all ${picked ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900'}`}
+                          >
+                            {sp.full_space_code}
+                            <span className={`ml-1 text-[10px] ${picked ? 'text-blue-100' : 'text-muted-foreground'}`}>({label})</span>
+                          </button>
+                        ) : (
+                          <Badge
+                            key={sp.full_space_code}
+                            variant="outline"
+                            className="bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 border-blue-300"
+                          >
+                            {sp.full_space_code}
+                            <span className="ml-1 text-xs text-muted-foreground">({label})</span>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                    {formErrors.current_spot_number && (
+                      <p className="text-xs text-red-600 mt-2">{formErrors.current_spot_number}</p>
+                    )}
+                  </div>
+                )}
+                {selectedTenantCode && selectedTenantSpots.length === 0 && (
+                  <div className="mt-2 p-3 bg-muted/40 border rounded-md text-sm text-muted-foreground">
+                    No parking spot on file for this resident, so this is a 1st Spot request.
+                  </div>
+                )}
+                {!selectedTenantCode && editingEntry?.current_spot_number && (
+                  <p className="text-xs text-muted-foreground mt-2">Current spot on file: {editingEntry.current_spot_number}</p>
+                )}
               </div>
 
               {/* Property & Unit - Auto-populated */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Property *</Label>
                   <Input
@@ -940,32 +1011,6 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                 </div>
               </div>
 
-              {/* Resident's current parking, from inventory */}
-              {selectedTenantCode && (
-                <div className={`rounded-md border p-3 text-sm ${selectedTenantSpots.length > 0 ? 'border-blue-200 bg-blue-50 dark:bg-blue-950/30' : 'bg-muted/30'}`}>
-                  {selectedTenantSpots.length === 0 ? (
-                    <span className="text-muted-foreground">No parking spot on file for this resident, so this is a 1st Spot request.</span>
-                  ) : (
-                    <>
-                      <div className="mb-2 font-medium">Current parking</div>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedTenantSpots.map(sp => (
-                          <button
-                            key={sp.full_space_code}
-                            type="button"
-                            onClick={() => setFormData(prev => ({ ...prev, current_spot_number: sp.full_space_code }))}
-                            className={`rounded border px-2 py-1 text-xs font-medium transition ${formData.current_spot_number === sp.full_space_code ? 'border-blue-600 bg-blue-600 text-white' : 'bg-white dark:bg-gray-900 text-blue-700 border-blue-300 hover:bg-blue-100'}`}
-                          >
-                            {sp.full_space_code}
-                            <span className="ml-1 opacity-80">({[sp.spot_type, sp.future_tenant_code === selectedTenantCode && sp.tenant_code !== selectedTenantCode ? 'Future' : sp.status].filter(Boolean).join(', ')})</span>
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
               {/* Waitlist Type */}
               <div>
                 <Label>Waitlist Type *</Label>
@@ -989,14 +1034,17 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                   <SelectContent>
                     {WAITLIST_TYPES.map(type => {
                       const hasSpot = selectedTenantSpots.length > 0;
-                      const disabled = !!selectedTenantCode && (
+                      const disabled = !editingEntry && !!selectedTenantCode && (
                         (type.value === '1st Spot' && hasSpot) ||
                         (type.value !== '1st Spot' && !hasSpot) ||
                         (type.value === 'Indoor Upgrade' && !selectedTenantSpots.some(sp => !isIndoorSpot(sp)))
                       );
                       return (
                         <SelectItem key={type.value} value={type.value} disabled={disabled}>
-                          {type.label} (Priority {type.priority})
+                          <div className="flex flex-col">
+                            <span>{type.label} (Priority {type.priority})</span>
+                            <span className="text-xs text-muted-foreground">{TYPE_DESCRIPTIONS[type.value]}</span>
+                          </div>
                         </SelectItem>
                       );
                     })}
@@ -1007,25 +1055,8 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                 )}
               </div>
 
-              {/* Current Spot (for Indoor Upgrade or 2nd Spot) */}
-              {(formData.waitlist_type === 'Indoor Upgrade' || formData.waitlist_type === '2nd Spot') && (
-                <div>
-                  <Label>
-                    Current Spot {formData.waitlist_type === 'Indoor Upgrade' ? '*' : '(optional)'}
-                  </Label>
-                  <Input
-                    value={formData.current_spot_number}
-                    onChange={(e) => setFormData({ ...formData, current_spot_number: e.target.value })}
-                    placeholder="e.g., Outdoor-15"
-                  />
-                  {formErrors.current_spot_number && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.current_spot_number}</p>
-                  )}
-                </div>
-              )}
-
-              {/* Preferred Spot Type */}
-              <div>
+              <div className="grid grid-cols-2 gap-4">
+                            <div>
                 <Label>Preferred Spot Type</Label>
                 <Select
                   value={formData.preferred_spot_type}
@@ -1041,40 +1072,6 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Contact Info Row */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="email@example.com"
-                  />
-                </div>
-                <div>
-                  <Label>Phone</Label>
-                  <Input
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="(555) 123-4567"
-                  />
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <Label>Notes</Label>
-                <Textarea
-                  value={formData.notes}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Any additional notes..."
-                  rows={2}
-                />
-              </div>
-
-              {/* Status (only when editing) */}
               {editingEntry && (
                 <div>
                   <Label>Status</Label>
@@ -1093,9 +1090,20 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                   </Select>
                 </div>
               )}
+              </div>
 
-              {/* Submit Button */}
-              <div className="flex justify-end gap-2 pt-2">
+              {/* Notes */}
+              <div>
+                <Label>Notes <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                <Textarea
+                  value={formData.notes}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Add any additional notes..."
+                  className="h-16 text-sm resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4">
                 <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                   Cancel
                 </Button>
@@ -1200,12 +1208,12 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                 key={property}
                 type="button"
                 onClick={() => { setSelectedProperty(active ? null : property); setExpandedId(null); }}
-                className={`flex flex-col items-center rounded-xl border px-3 py-4 text-center shadow-sm transition-all ${active ? 'border-blue-600 bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-gray-900 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md'} ${list.length === 0 && !active ? 'opacity-60' : ''}`}
+                className={`flex flex-col items-center rounded-xl border px-3 py-4 text-center shadow-sm transition-all ${active ? 'border-blue-600 bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-gray-900 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md'} border-t-4 ${active ? 'border-t-blue-600' : list.length > 0 ? 'border-t-blue-500' : 'border-t-gray-200 dark:border-t-gray-700'} ${list.length === 0 && !active ? 'opacity-60' : ''}`}
               >
                 <span className={`max-w-full truncate text-sm font-medium ${active ? 'text-blue-50' : 'text-muted-foreground'}`} title={property}>
                   {property}
                 </span>
-                <span className={`mt-2 text-4xl font-bold tabular-nums leading-none ${active ? 'text-white' : 'text-gray-900 dark:text-gray-50'}`}>
+                <span className={`mt-2 text-4xl font-bold tabular-nums leading-none ${active ? 'text-white' : list.length > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>
                   {list.length}
                 </span>
                 <span className={`mt-1 text-xs ${active ? 'text-blue-100' : 'text-muted-foreground'}`}>on waitlist</span>

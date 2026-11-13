@@ -1559,10 +1559,10 @@ export default function ParkingPage() {
                                 key={prop}
                                 type="button"
                                 onClick={() => setUpcomingProperty(active ? null : prop)}
-                                className={`flex flex-col items-center rounded-xl border px-3 py-4 text-center shadow-sm transition-all ${active ? 'border-blue-600 bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-gray-900 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md'} ${propUpcoming.length === 0 && !active ? 'opacity-60' : ''}`}
+                                className={`flex flex-col items-center rounded-xl border px-3 py-4 text-center shadow-sm transition-all ${active ? 'border-blue-600 bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-gray-900 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md'} border-t-4 ${active ? 'border-t-blue-600' : propUpcoming.length > 0 ? 'border-t-blue-500' : 'border-t-gray-200 dark:border-t-gray-700'} ${propUpcoming.length === 0 && !active ? 'opacity-60' : ''}`}
                               >
                                 <span className={`max-w-full truncate text-sm font-medium ${active ? 'text-blue-50' : 'text-muted-foreground'}`} title={prop}>{prop}</span>
-                                <span className={`mt-2 text-4xl font-bold tabular-nums leading-none ${active ? 'text-white' : 'text-gray-900 dark:text-gray-50'}`}>{propUpcoming.length}</span>
+                                <span className={`mt-2 text-4xl font-bold tabular-nums leading-none ${active ? 'text-white' : propUpcoming.length > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>{propUpcoming.length}</span>
                                 <span className={`mt-1 text-xs ${active ? 'text-blue-100' : 'text-muted-foreground'}`}>upcoming</span>
                                 <span className={`mt-3 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium ${matched > 0 ? (active ? 'bg-white/20 text-white' : 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300') : (active ? 'text-blue-100' : 'text-muted-foreground')}`}>
                                   {matched > 0 ? `${matched} with match` : 'No matches'}

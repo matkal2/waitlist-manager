@@ -713,12 +713,12 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail, units = []
                 key={property}
                 type="button"
                 onClick={() => setPropertyFilter(active ? 'none' : property)}
-                className={`flex flex-col items-center rounded-xl border px-3 py-4 text-center shadow-sm transition-all ${active ? 'border-blue-600 bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-gray-900 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md'} ${list.length === 0 && !active ? 'opacity-60' : ''}`}
+                className={`flex flex-col items-center rounded-xl border px-3 py-4 text-center shadow-sm transition-all ${active ? 'border-blue-600 bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-gray-900 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md'} border-t-4 ${active ? 'border-t-blue-600' : list.length > 0 ? 'border-t-blue-500' : 'border-t-gray-200 dark:border-t-gray-700'} ${list.length === 0 && !active ? 'opacity-60' : ''}`}
               >
                 <span className={`max-w-full truncate text-sm font-medium ${active ? 'text-blue-50' : 'text-muted-foreground'}`} title={property}>
                   {property}
                 </span>
-                <span className={`mt-2 text-4xl font-bold tabular-nums leading-none ${active ? 'text-white' : 'text-gray-900 dark:text-gray-50'}`}>
+                <span className={`mt-2 text-4xl font-bold tabular-nums leading-none ${active ? 'text-white' : list.length > 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>
                   {list.length}
                 </span>
                 <span className={`mt-1 text-xs ${active ? 'text-blue-100' : 'text-muted-foreground'}`}>on waitlist</span>
