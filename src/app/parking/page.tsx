@@ -25,7 +25,7 @@ import { ParkingChangeForm, type ChangeFormPrefill } from '@/components/parking-
 import { ParkingReserveForm } from '@/components/parking-reserve-form';
 import { ParkingReservationMatches } from '@/components/parking-reservation-matches';
 import { ParkingWaitlistTable } from '@/components/parking-waitlist-table';
-import { getSpotMatches } from '@/lib/parking-matching';
+import { getSpotMatches, normalizeParkingProperty } from '@/lib/parking-matching';
 import { exportParkingToPDF } from '@/lib/pdf-export';
 import { permissions } from '@/lib/permissions';
 
@@ -205,7 +205,9 @@ export default function ParkingPage() {
       
       // Fetch waitlist from Supabase
       const waitlistRes = await supabase.from('parking_waitlist').select('*').order('created_at', { ascending: true });
-      if (waitlistRes.data) setWaitlist(waitlistRes.data as ParkingWaitlist[]);
+      if (waitlistRes.data) {
+        setWaitlist((waitlistRes.data as ParkingWaitlist[]).map(w => ({ ...w, property: normalizeParkingProperty(w.property) })));
+      }
       
       // Fetch activity log from parking_changes
       const activityRes = await fetch('/api/parking/change');

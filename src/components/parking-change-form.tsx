@@ -23,6 +23,7 @@ import { Plus, Eye, Zap, Accessibility, Search, X, User, Car } from 'lucide-reac
 import { Badge } from '@/components/ui/badge';
 import { PROPERTY_UNITS } from '@/lib/property-units';
 import { getAllowedParkingProperties } from '@/lib/properties';
+import { isOnResidentSideOfStreet } from '@/lib/parking-matching';
 
 interface ParkingSpot {
   id: string;
@@ -290,6 +291,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
           // Exclude spots that have a future tenant assigned
           if (spot.has_future_tenant || spot.future_tenant_code) return false;
           if (spot.status !== 'Vacant' && spot.status !== 'Notice') return false;
+          if (!isOnResidentSideOfStreet(spot, tenantUnit)) return false;
           return isSpotAvailableByDate(spot);
         } else if (changeType === 'Transfer') {
           // Transfer: Primary space is the current occupied spot
@@ -327,6 +329,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
         if (spot.has_future_tenant || spot.future_tenant_code) return false;
         // Show Vacant and Notice spots that are available by effective date
         if (spot.status !== 'Vacant' && spot.status !== 'Notice') return false;
+        if (!isOnResidentSideOfStreet(spot, tenantUnit)) return false;
         return isSpotAvailableByDate(spot);
       })
       .map(spot => {

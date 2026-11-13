@@ -22,6 +22,24 @@ export const WAITLIST_TYPE_PRIORITY: Record<string, number> = {
   '2nd Spot': 3,
 };
 
+// Waitlist rows saved with older property names ("W. Montrose") use the inventory name
+const PROPERTY_ALIASES: Record<string, string> = {
+  'W. Montrose': 'West Montrose',
+  'W Montrose': 'West Montrose',
+};
+export const normalizeParkingProperty = (property: string) => PROPERTY_ALIASES[property] || property;
+
+// West Montrose residents park on their own side of the street:
+// even buildings (3634, 3640, 3644, 3648) and odd buildings (3639, 3643, 3647)
+const SAME_SIDE_PROPERTIES = ['West Montrose'];
+export function isOnResidentSideOfStreet(spot: MatchableSpot, unit: string | null | undefined): boolean {
+  if (!SAME_SIDE_PROPERTIES.includes(spot.property)) return true;
+  const spotBuilding = spot.full_space_code.match(/(\d{4})\s*-/)?.[1];
+  const unitBuilding = (unit || '').trim().match(/^(\d{4})-/)?.[1];
+  if (!spotBuilding || !unitBuilding) return true;
+  return Number(spotBuilding) % 2 === Number(unitBuilding) % 2;
+}
+
 const startsWithType = (spotType: string | null | undefined, type: string) =>
   (spotType || '').toLowerCase().startsWith(type.toLowerCase());
 
@@ -29,7 +47,8 @@ const startsWithType = (spotType: string | null | undefined, type: string) =>
 export function entryMatchesSpot(entry: ParkingWaitlist, spot: MatchableSpot): boolean {
   if (entry.status !== 'Active') return false;
   const residentProperties = [spot.property, ...getSharedResidentProperties(spot.property)];
-  if (!residentProperties.includes(entry.property)) return false;
+  if (!residentProperties.includes(normalizeParkingProperty(entry.property))) return false;
+  if (!isOnResidentSideOfStreet(spot, entry.unit_number)) return false;
   if (entry.waitlist_type === 'Indoor Upgrade') {
     if (!startsWithType(spot.spot_type, 'Indoor')) return false;
   } else if (entry.waitlist_type !== '1st Spot') {
@@ -47,7 +66,7 @@ export function getSpotMatches(spot: MatchableSpot, waitlist: ParkingWaitlist[])
   return waitlist
     .filter(entry => entryMatchesSpot(entry, spot))
     .sort((a, b) =>
-      residentProperties.indexOf(a.property) - residentProperties.indexOf(b.property) ||
+      residentProperties.indexOf(normalizeParkingProperty(a.property)) - residentProperties.indexOf(normalizeParkingProperty(b.property)) ||
       (WAITLIST_TYPE_PRIORITY[a.waitlist_type] || 3) - (WAITLIST_TYPE_PRIORITY[b.waitlist_type] || 3) ||
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );

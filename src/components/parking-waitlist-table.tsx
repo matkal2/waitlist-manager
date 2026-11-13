@@ -213,7 +213,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
     'Broadway': 'Broadway',
     'Granville': 'Granville',
     'Pratt': 'Pratt',
-    'West Montrose': 'W. Montrose',
+    'West Montrose': 'West Montrose',
     'Glenlake': 'Glenlake',
     'North Clark': 'North Clark',
     'N. Clark': 'North Clark',
