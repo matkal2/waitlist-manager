@@ -112,6 +112,7 @@ export default function ParkingPage() {
   const [activityDateFrom, setActivityDateFrom] = useState<string>('');
   const [activityDateTo, setActivityDateTo] = useState<string>('');
   const [activitySearch, setActivitySearch] = useState<string>('');
+  const [activityMineOnly, setActivityMineOnly] = useState(false);
   
   // Filters
   const [activeTab, setActiveTab] = useState<string>('inventory');
@@ -445,11 +446,39 @@ export default function ParkingPage() {
   };
 
   // Admins can undo/restore any change; everyone else only their own
-  const canModifyChange = (change: ParkingChange) => {
-    if (userRole === 'admin') return true;
+  const canModifyChange = (change: ParkingChange) => userRole === 'admin' || isOwnChange(change);
+
+  const isOwnChange = (change: ParkingChange) => {
     const submitter = (change.submitter || '').trim().toLowerCase();
-    if (!submitter) return false;
-    return [userFullName, user?.email].some(id => id && id.trim().toLowerCase() === submitter);
+    return !!submitter && [userFullName, user?.email].some(id => id && id.trim().toLowerCase() === submitter);
+  };
+
+  const filteredActivity = activityLog.filter(a => {
+    if (activityFilter !== 'all' && a.type !== activityFilter) return false;
+    if (activityMineOnly && !isOwnChange(a)) return false;
+    if (activityDateFrom && new Date(a.submission_date) < new Date(activityDateFrom)) return false;
+    if (activityDateTo) {
+      const toDate = new Date(activityDateTo);
+      toDate.setHours(23, 59, 59);
+      if (new Date(a.submission_date) > toDate) return false;
+    }
+    if (activitySearch) {
+      const query = activitySearch.toLowerCase();
+      return a.tenant_name.toLowerCase().includes(query) ||
+        a.tenant_unit.toLowerCase().includes(query) ||
+        a.primary_space.toLowerCase().includes(query);
+    }
+    return true;
+  });
+
+  const activityDayLabel = (iso: string) => {
+    const d = new Date(iso);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    if (d.toDateString() === today.toDateString()) return 'Today';
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   };
 
   // Check if a reverted change can be undone (within 24 hours)
@@ -1213,7 +1242,7 @@ export default function ParkingPage() {
                     <div>
                       <CardTitle>Parking Activity Log</CardTitle>
                       <CardDescription>
-                        View all parking change requests submitted.
+                        Every parking change, newest first. You can undo or restore your own changes.
                       </CardDescription>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1221,26 +1250,7 @@ export default function ParkingPage() {
                         variant="outline" 
                         size="sm"
                         onClick={() => {
-                          const filtered = activityLog.filter(a => {
-                            if (activityFilter !== 'all' && a.type !== activityFilter) return false;
-                            if (activityDateFrom) {
-                              const date = new Date(a.submission_date);
-                              if (date < new Date(activityDateFrom)) return false;
-                            }
-                            if (activityDateTo) {
-                              const date = new Date(a.submission_date);
-                              const toDate = new Date(activityDateTo);
-                              toDate.setHours(23, 59, 59);
-                              if (date > toDate) return false;
-                            }
-                            if (activitySearch) {
-                              const query = activitySearch.toLowerCase();
-                              return a.tenant_name.toLowerCase().includes(query) ||
-                                a.tenant_unit.toLowerCase().includes(query) ||
-                                a.primary_space.toLowerCase().includes(query);
-                            }
-                            return true;
-                          });
+                          const filtered = filteredActivity;
                           const csv = [
                             ['Date', 'Type', 'Tenant', 'Unit', 'Space', 'Transfer To', 'Effective Date', 'Submitter', 'Notes'].join(','),
                             ...filtered.map(a => [
@@ -1282,18 +1292,6 @@ export default function ParkingPage() {
                         className="pl-10"
                       />
                     </div>
-                    <Select value={activityFilter} onValueChange={setActivityFilter}>
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue placeholder="All Types" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="Termination">Termination</SelectItem>
-                        <SelectItem value="Add">Add</SelectItem>
-                        <SelectItem value="Transfer">Transfer</SelectItem>
-                        <SelectItem value="New Lease Signed">New Lease</SelectItem>
-                      </SelectContent>
-                    </Select>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <Input
@@ -1311,7 +1309,7 @@ export default function ParkingPage() {
                         className="w-[140px]"
                         placeholder="To"
                       />
-                      {(activityDateFrom || activityDateTo || activitySearch) && (
+                      {(activityDateFrom || activityDateTo || activitySearch || activityMineOnly || activityFilter !== 'all') && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1319,6 +1317,8 @@ export default function ParkingPage() {
                             setActivityDateFrom('');
                             setActivityDateTo('');
                             setActivitySearch('');
+                            setActivityMineOnly(false);
+                            setActivityFilter('all');
                           }}
                         >
                           Clear
@@ -1341,148 +1341,133 @@ export default function ParkingPage() {
                     <p className="text-sm">Submit parking change requests to see them here.</p>
                   </div>
                 ) : (
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[100px]">Date</TableHead>
-                          <TableHead className="w-[100px]">Type</TableHead>
-                          <TableHead>Tenant</TableHead>
-                          <TableHead>Space</TableHead>
-                          <TableHead>Effective</TableHead>
-                          <TableHead>Submitter</TableHead>
-                          <TableHead className="w-[60px]">Status</TableHead>
-                          <TableHead className="w-[80px]">Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {activityLog
-                          .filter(a => {
-                            if (activityFilter !== 'all' && a.type !== activityFilter) return false;
-                            if (activityDateFrom) {
-                              const date = new Date(a.submission_date);
-                              if (date < new Date(activityDateFrom)) return false;
-                            }
-                            if (activityDateTo) {
-                              const date = new Date(a.submission_date);
-                              const toDate = new Date(activityDateTo);
-                              toDate.setHours(23, 59, 59);
-                              if (date > toDate) return false;
-                            }
-                            if (activitySearch) {
-                              const query = activitySearch.toLowerCase();
-                              return a.tenant_name.toLowerCase().includes(query) ||
-                                a.tenant_unit.toLowerCase().includes(query) ||
-                                a.primary_space.toLowerCase().includes(query);
-                            }
-                            return true;
-                          })
-                          .map((activity) => (
-                            <TableRow key={activity.id}>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {new Date(activity.submission_date).toLocaleDateString()}
-                              </TableCell>
-                              <TableCell>
-                                <Badge 
-                                  className={`text-white ${
-                                    activity.type === 'Termination' ? 'bg-red-500' :
-                                    activity.type === 'Add' ? 'bg-green-500' :
-                                    activity.type === 'Transfer' ? 'bg-blue-500' :
-                                    'bg-purple-500'
-                                  }`}
-                                >
-                                  {activity.type}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div>
-                                  <div className="font-medium">{activity.tenant_name}</div>
-                                  <div className="text-xs text-muted-foreground">{activity.tenant_unit}</div>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div>
-                                  <div className="font-medium">{activity.primary_space}</div>
-                                  {activity.transfer_to_space && (
-                                    <div className="text-xs text-muted-foreground">→ {activity.transfer_to_space}</div>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-sm">
-                                {new Date(activity.effective_date).toLocaleDateString()}
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {activity.submitter}
-                              </TableCell>
-                              <TableCell>
-                                {activity.reverted ? (
-                                  <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50">
-                                    Reverted
-                                  </Badge>
-                                ) : activity.type === 'Reserve' || activity.type === 'Cancel Reservation' ? (
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-gray-500 border-gray-300" title="Reservations are tracked in the app only and are not synced to the sheet">
-                                    App only
-                                  </Badge>
-                                ) : activity.synced_to_sheet ? (
-                                  <span title="Synced to sheet"><CheckCircle className="h-4 w-4 text-green-500" /></span>
-                                ) : (
-                                  <span title="Not synced"><AlertTriangle className="h-4 w-4 text-yellow-500" /></span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {!canModifyChange(activity) ? null : !activity.reverted ? (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 px-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                                    onClick={() => handleRevertChange(activity)}
-                                    disabled={revertingId === activity.id}
-                                    title="Undo this change"
-                                  >
-                                    {revertingId === activity.id ? (
-                                      <RefreshCw className="h-4 w-4 animate-spin" />
+                  <div className="space-y-5">
+                    {/* Type cards (click to filter) + mine toggle */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {[
+                        { key: 'all', label: 'All changes' },
+                        { key: 'Add', label: 'Add' },
+                        { key: 'Termination', label: 'Termination' },
+                        { key: 'Transfer', label: 'Transfer' },
+                        { key: 'New Lease Signed', label: 'New Lease' },
+                      ].map(option => {
+                        const count = option.key === 'all' ? activityLog.length : activityLog.filter(a => a.type === option.key).length;
+                        const active = activityFilter === option.key;
+                        return (
+                          <button
+                            key={option.key}
+                            type="button"
+                            onClick={() => setActivityFilter(option.key)}
+                            className={`rounded-full border px-3 py-1 text-sm transition ${active ? 'border-blue-600 bg-blue-600 text-white' : 'bg-white dark:bg-gray-900 text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                          >
+                            {option.label} <span className={active ? 'text-blue-100' : 'text-muted-foreground'}>{count}</span>
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setActivityMineOnly(v => !v)}
+                        className={`ml-auto rounded-full border px-3 py-1 text-sm transition ${activityMineOnly ? 'border-blue-600 bg-blue-600 text-white' : 'bg-white dark:bg-gray-900 text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                      >
+                        <User className="mr-1 inline h-3.5 w-3.5" />
+                        My changes only
+                      </button>
+                    </div>
+
+                    {filteredActivity.length === 0 ? (
+                      <div className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+                        No changes match these filters
+                      </div>
+                    ) : (
+                      Object.entries(
+                        filteredActivity.reduce<Record<string, ParkingChange[]>>((groups, a) => {
+                          const label = activityDayLabel(a.submission_date);
+                          (groups[label] ||= []).push(a);
+                          return groups;
+                        }, {})
+                      ).map(([day, items]) => (
+                        <div key={day}>
+                          <h3 className="mb-2 text-sm font-medium text-muted-foreground">
+                            {day} <span className="font-normal">· {items.length} {items.length === 1 ? 'change' : 'changes'}</span>
+                          </h3>
+                          <div className="divide-y rounded-xl border bg-white dark:bg-gray-900 shadow-sm">
+                            {items.map(activity => {
+                              const typeStyle =
+                                activity.type === 'Termination' ? 'bg-red-50 text-red-700 border-red-200' :
+                                activity.type === 'Add' ? 'bg-green-50 text-green-700 border-green-200' :
+                                activity.type === 'Transfer' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                'bg-purple-50 text-purple-700 border-purple-200';
+                              return (
+                                <div key={activity.id} className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 ${activity.reverted ? 'opacity-60' : ''}`}>
+                                  <span className={`w-[110px] shrink-0 rounded-full border px-2 py-0.5 text-center text-xs font-medium ${typeStyle}`}>
+                                    {activity.type}
+                                  </span>
+                                  <div className="min-w-[180px] flex-1">
+                                    <div className={`font-medium ${activity.reverted ? 'line-through' : ''}`}>
+                                      {activity.tenant_name}
+                                      <span className="ml-2 text-sm font-normal text-muted-foreground">{activity.tenant_unit}</span>
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                      {activity.primary_space}
+                                      {activity.transfer_to_space && <> → {activity.transfer_to_space}</>}
+                                      <span className="mx-1.5">·</span>
+                                      Effective {new Date(activity.effective_date).toLocaleDateString()}
+                                    </div>
+                                  </div>
+                                  <div className="w-[160px] shrink-0 text-sm text-muted-foreground truncate" title={activity.submitter}>
+                                    by {activity.submitter}
+                                  </div>
+                                  <div className="w-[90px] shrink-0">
+                                    {activity.reverted ? (
+                                      <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50">Undone</Badge>
+                                    ) : activity.type === 'Reserve' || activity.type === 'Cancel Reservation' ? (
+                                      <Badge variant="outline" className="text-gray-500 border-gray-300" title="Reservations are tracked in the app only and are not synced to the sheet">App only</Badge>
+                                    ) : activity.synced_to_sheet ? (
+                                      <span className="inline-flex items-center gap-1 text-xs text-green-700" title="Synced to sheet"><CheckCircle className="h-3.5 w-3.5" />In sheet</span>
                                     ) : (
-                                      <Undo2 className="h-4 w-4" />
+                                      <span className="inline-flex items-center gap-1 text-xs text-yellow-700" title="Not synced"><AlertTriangle className="h-3.5 w-3.5" />Not synced</span>
                                     )}
-                                  </Button>
-                                ) : canUndoRevert(activity) ? (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                    onClick={() => handleUndoRevert(activity)}
-                                    disabled={revertingId === activity.id}
-                                    title="Restore this change"
-                                  >
-                                    {revertingId === activity.id ? (
-                                      <RefreshCw className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <span className="text-xs font-medium">Restore</span>
-                                    )}
-                                  </Button>
-                                ) : null}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                      </TableBody>
-                    </Table>
-                    <div className="px-4 py-2 text-sm text-muted-foreground border-t">
-                      Showing {activityLog.filter(a => {
-                        if (activityFilter !== 'all' && a.type !== activityFilter) return false;
-                        if (activityDateFrom && new Date(a.submission_date) < new Date(activityDateFrom)) return false;
-                        if (activityDateTo) {
-                          const toDate = new Date(activityDateTo);
-                          toDate.setHours(23, 59, 59);
-                          if (new Date(a.submission_date) > toDate) return false;
-                        }
-                        if (activitySearch) {
-                          const query = activitySearch.toLowerCase();
-                          return a.tenant_name.toLowerCase().includes(query) ||
-                            a.tenant_unit.toLowerCase().includes(query) ||
-                            a.primary_space.toLowerCase().includes(query);
-                        }
-                        return true;
-                      }).length} of {activityLog.length} entries
+                                  </div>
+                                  <div className="w-[90px] shrink-0 text-right">
+                                    {!canModifyChange(activity) ? null : !activity.reverted ? (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 px-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                                        onClick={() => handleRevertChange(activity)}
+                                        disabled={revertingId === activity.id}
+                                        title="Undo this change"
+                                      >
+                                        {revertingId === activity.id ? (
+                                          <RefreshCw className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <><Undo2 className="h-3.5 w-3.5 mr-1" />Undo</>
+                                        )}
+                                      </Button>
+                                    ) : canUndoRevert(activity) ? (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                        onClick={() => handleUndoRevert(activity)}
+                                        disabled={revertingId === activity.id}
+                                        title="Restore this change"
+                                      >
+                                        {revertingId === activity.id ? (
+                                          <RefreshCw className="h-4 w-4 animate-spin" />
+                                        ) : 'Restore'}
+                                      </Button>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    <div className="text-sm text-muted-foreground">
+                      Showing {filteredActivity.length} of {activityLog.length} entries
                     </div>
                   </div>
                 )}

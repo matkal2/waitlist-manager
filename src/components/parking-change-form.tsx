@@ -776,9 +776,6 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                         {spot.spotType && (
                           <span className="text-xs text-muted-foreground">{spot.spotType}</span>
                         )}
-                          {spot.spotType && (
-                            <span className="text-xs text-muted-foreground">{spot.spotType}</span>
-                          )}
                           {spot.property !== selectedProperty && (
                             <Badge variant="outline" className="text-xs bg-sky-50 text-sky-700 border-sky-200">
                               Shared lot

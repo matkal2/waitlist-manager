@@ -251,20 +251,21 @@ export function ParkingReserveForm({ spot, spots = [], open, onOpenChange, onSuc
                 <Home className="h-3 w-3" />
                 Unit Number *
               </Label>
-<Input
-                id="unit_number"
-                list="reserve-unit-options"
+<Select
                 value={formData.unit_number}
-                onChange={(e) => setFormData({ ...formData, unit_number: e.target.value })}
-                placeholder={units.length > 0 ? 'Select or type unit' : 'Type unit number'}
-                autoComplete="off"
-                required
-              />
-              <datalist id="reserve-unit-options">
-                {units.map((unit) => (
-                  <option key={unit} value={unit} />
-                ))}
-              </datalist>
+                onValueChange={(value) => setFormData({ ...formData, unit_number: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {units.map((unit) => (
+                    <SelectItem key={unit} value={unit}>
+                      {unit}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           
