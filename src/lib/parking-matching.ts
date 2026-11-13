@@ -22,12 +22,21 @@ export const WAITLIST_TYPE_PRIORITY: Record<string, number> = {
   '2nd Spot': 3,
 };
 
-// Waitlist rows saved with older property names ("W. Montrose") use the inventory name
-const PROPERTY_ALIASES: Record<string, string> = {
-  'W. Montrose': 'West Montrose',
-  'W Montrose': 'West Montrose',
+// Older waitlist rows hold short names ("W. Montrose") or Yardi codes ("Wmontros"); map them to inventory names
+export const PROPERTY_ALIASES: Record<string, string> = {
+  'w. montrose': 'West Montrose',
+  'w montrose': 'West Montrose',
+  'wmontros': 'West Montrose',
+  'nclark': 'North Clark',
+  'n. clark': 'North Clark',
+  'csidec': 'Countryside C',
+  'csidet': 'Countryside T',
+  'fullerto': 'Fullerton',
+  'greenlea': 'Greenleaf',
+  'sheffiel': 'Sheffield',
 };
-export const normalizeParkingProperty = (property: string) => PROPERTY_ALIASES[property] || property;
+export const normalizeParkingProperty = (property: string) =>
+  PROPERTY_ALIASES[(property || '').trim().toLowerCase()] || property;
 
 // West Montrose residents park on their own side of the street:
 // even buildings (3634, 3640, 3644, 3648) and odd buildings (3639, 3643, 3647)
@@ -51,7 +60,7 @@ export function entryMatchesSpot(entry: ParkingWaitlist, spot: MatchableSpot): b
   if (!isOnResidentSideOfStreet(spot, entry.unit_number)) return false;
   if (entry.waitlist_type === 'Indoor Upgrade') {
     if (!startsWithType(spot.spot_type, 'Indoor')) return false;
-  } else if (entry.waitlist_type !== '1st Spot') {
+  } else if (entry.waitlist_type !== '1st Spot' && entry.waitlist_type !== '2nd Spot') {
     return false;
   }
   const preferred = entry.preferred_spot_type;

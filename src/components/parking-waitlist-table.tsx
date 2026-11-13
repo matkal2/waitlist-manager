@@ -302,10 +302,15 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
   };
 
   const openEditDialog = (entry: ParkingWaitlist) => {
+    const namesakes = directory.filter(d => normalizePersonName(d.residentName) === normalizePersonName(entry.tenant_name));
+    // Fix units saved garbled (e.g. "638140" for 3647-3) when the Directory has one clear match
+    const directoryUnit = namesakes.length === 1 && namesakes[0].unitNumber && !namesakes.some(d => d.unitNumber === entry.unit_number)
+      ? namesakes[0].unitNumber
+      : null;
     setEditingEntry(entry);
     setFormData({
       tenant_name: entry.tenant_name,
-      unit_number: entry.unit_number,
+      unit_number: directoryUnit || entry.unit_number,
       email: entry.email || '',
       phone: entry.phone || '',
       property: entry.property,
@@ -319,7 +324,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
     setSelectedTenantCode(
       directory.find(d =>
         normalizePersonName(d.residentName) === normalizePersonName(entry.tenant_name) &&
-        (!d.unitNumber || d.unitNumber === entry.unit_number)
+        (!d.unitNumber || d.unitNumber === (directoryUnit || entry.unit_number))
       )?.tenantCode || ''
     );
     setFormErrors({});

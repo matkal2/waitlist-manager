@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { normalizeParkingProperty } from '@/lib/parking-matching';
 
 const PARKING_SPREADSHEET_ID = '1w78XH8yuyuoZm_l1PtHIFzXygwEjS56lV0rZwEQvNwM';
 
@@ -39,7 +40,7 @@ async function fetchDirectory(): Promise<DirectoryEntry[]> {
     // Column B (index 1) = Unit Number, Column C (index 2) = Tenant Code, 
     // Column D (index 3) = Resident Name, Column I (index 8) = Status,
     // Column R (index 17) = Property, Column S (index 18) = Unique ID
-    let unitNumber = cells[1]?.v?.toString() || cells[1]?.f?.toString() || '';
+    let unitNumber = readUnitCell(cells[1]);
     const tenantCode = cells[2]?.v?.toString() || '';
     const residentName = cells[3]?.v?.toString() || '';
     const status = cells[8]?.v?.toString() || '';
@@ -84,7 +85,7 @@ async function fetchDirectory(): Promise<DirectoryEntry[]> {
     }
     
     // Title case the property name
-    const property = propertyRaw ? titleCaseProperty(propertyRaw) : undefined;
+    const property = propertyRaw ? normalizeParkingProperty(titleCaseProperty(propertyRaw)) : undefined;
     
     entries.push({
       tenantCode,
@@ -97,6 +98,13 @@ async function fetchDirectory(): Promise<DirectoryEntry[]> {
   
   return entries;
 }
+
+// Sheets turns units like "3647-3" into dates; gviz then sends a serial number (638140) as v and "3647-3" as f
+const readUnitCell = (cell: { v?: unknown; f?: string } | null | undefined): string => {
+  const formatted = cell?.f?.toString() || '';
+  if (formatted && /[-A-Za-z]/.test(formatted)) return formatted;
+  return cell?.v?.toString() || formatted;
+};
 
 export async function GET() {
   try {

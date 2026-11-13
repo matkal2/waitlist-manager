@@ -148,7 +148,7 @@ async function fetchDirectory(): Promise<Map<string, DirectoryEntry>> {
     
     // Column B (index 1) = Unit Number, Column C (index 2) = Tenant Code, Column D (index 3) = Resident Name
     // Column S (index 18) = Unique ID (e.g., "elston 3434-101")
-    let unitNumber = cells[1]?.v?.toString() || cells[1]?.f?.toString() || null;
+    let unitNumber: string | null = readUnitCell(cells[1]) || null;
     const tenantCode = cells[2]?.v?.toString() || '';
     const residentName = cells[3]?.v?.toString() || '';
     const uniqueId = cells[18]?.v?.toString() || '';
@@ -471,6 +471,13 @@ async function fetchReservations(): Promise<ParkingReservation[]> {
     return [];
   }
 }
+
+// Sheets turns units like "3647-3" into dates; gviz then sends a serial number (638140) as v and "3647-3" as f
+const readUnitCell = (cell: { v?: unknown; f?: string } | null | undefined): string => {
+  const formatted = cell?.f?.toString() || '';
+  if (formatted && /[-A-Za-z]/.test(formatted)) return formatted;
+  return cell?.v?.toString() || formatted;
+};
 
 export async function GET() {
   try {
