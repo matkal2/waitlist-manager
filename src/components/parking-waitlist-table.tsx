@@ -265,13 +265,25 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
     'W. Chicago': 'W. Chicago',
   };
 
+  // Spots a resident holds now or is set to take over
+  const getTenantSpots = (tenantCode: string) =>
+    tenantCode ? spots.filter(sp => sp.tenant_code === tenantCode || sp.future_tenant_code === tenantCode) : [];
+  const isIndoorSpot = (sp: MatchableSpot) => (sp.spot_type || '').toLowerCase().startsWith('indoor');
+  const selectedTenantSpots = getTenantSpots(selectedTenantCode);
+
   // Handle tenant selection from directory
   const handleTenantSelect = (entry: { tenantCode: string; residentName: string; unitNumber?: string; property?: string }) => {
+    const held = getTenantSpots(entry.tenantCode);
+    const outdoor = held.find(sp => !isIndoorSpot(sp));
     setFormData(prev => ({
       ...prev,
       tenant_name: entry.residentName,
       property: entry.property ? (propertyNameMap[entry.property] || entry.property) : prev.property,
       unit_number: entry.unitNumber || prev.unit_number,
+      waitlist_type: held.length === 0 ? '1st Spot' : prev.waitlist_type === '1st Spot' ? '2nd Spot' : prev.waitlist_type,
+      current_spot_number: held.length === 0
+        ? ''
+        : (prev.waitlist_type === 'Indoor Upgrade' && outdoor ? outdoor : held[0]).full_space_code,
     }));
     setSelectedTenantCode(entry.tenantCode);
     setTenantSearch(entry.residentName);
@@ -286,6 +298,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
       tenant_name: '',
       property: '',
       unit_number: '',
+      current_spot_number: '',
     }));
     setSelectedTenantCode('');
     setTenantSearch('');
@@ -927,22 +940,66 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                 </div>
               </div>
 
+              {/* Resident's current parking, from inventory */}
+              {selectedTenantCode && (
+                <div className={`rounded-md border p-3 text-sm ${selectedTenantSpots.length > 0 ? 'border-blue-200 bg-blue-50 dark:bg-blue-950/30' : 'bg-muted/30'}`}>
+                  {selectedTenantSpots.length === 0 ? (
+                    <span className="text-muted-foreground">No parking spot on file for this resident, so this is a 1st Spot request.</span>
+                  ) : (
+                    <>
+                      <div className="mb-2 font-medium">Current parking</div>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedTenantSpots.map(sp => (
+                          <button
+                            key={sp.full_space_code}
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, current_spot_number: sp.full_space_code }))}
+                            className={`rounded border px-2 py-1 text-xs font-medium transition ${formData.current_spot_number === sp.full_space_code ? 'border-blue-600 bg-blue-600 text-white' : 'bg-white dark:bg-gray-900 text-blue-700 border-blue-300 hover:bg-blue-100'}`}
+                          >
+                            {sp.full_space_code}
+                            <span className="ml-1 opacity-80">({[sp.spot_type, sp.future_tenant_code === selectedTenantCode && sp.tenant_code !== selectedTenantCode ? 'Future' : sp.status].filter(Boolean).join(', ')})</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
               {/* Waitlist Type */}
               <div>
                 <Label>Waitlist Type *</Label>
                 <Select
                   value={formData.waitlist_type}
-                  onValueChange={(value) => setFormData({ ...formData, waitlist_type: value as ParkingWaitlistType })}
+                  onValueChange={(value) => {
+                    const type = value as ParkingWaitlistType;
+                    const outdoor = selectedTenantSpots.find(sp => !isIndoorSpot(sp));
+                    setFormData({
+                      ...formData,
+                      waitlist_type: type,
+                      current_spot_number: type === 'Indoor Upgrade' && outdoor
+                        ? outdoor.full_space_code
+                        : formData.current_spot_number,
+                    });
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {WAITLIST_TYPES.map(type => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label} (Priority {type.priority})
-                      </SelectItem>
-                    ))}
+                    {WAITLIST_TYPES.map(type => {
+                      const hasSpot = selectedTenantSpots.length > 0;
+                      const disabled = !!selectedTenantCode && (
+                        (type.value === '1st Spot' && hasSpot) ||
+                        (type.value !== '1st Spot' && !hasSpot) ||
+                        (type.value === 'Indoor Upgrade' && !selectedTenantSpots.some(sp => !isIndoorSpot(sp)))
+                      );
+                      return (
+                        <SelectItem key={type.value} value={type.value} disabled={disabled}>
+                          {type.label} (Priority {type.priority})
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
                 {formErrors.waitlist_type && (

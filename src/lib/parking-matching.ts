@@ -12,6 +12,8 @@ export interface MatchableSpot {
   termination_date?: string | null;
   reserved_for_applicant?: string | null;
   has_future_tenant?: boolean;
+  tenant_code?: string | null;
+  future_tenant_code?: string | null;
 }
 
 export const WAITLIST_TYPE_PRIORITY: Record<string, number> = {
