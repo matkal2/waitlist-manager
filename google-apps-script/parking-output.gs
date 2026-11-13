@@ -29,13 +29,13 @@ function doPost(e) {
     
     const data = JSON.parse(e.postData.contents);
     
-    // Expected columns in OUTPUT tab:
-    // Type | Tenant Name | Tenant Unit | Property | Effective Date | Primary Space | Transfer To Space | Submitter | Other Notes | Submission Date
+    // OUTPUT columns (A-J):
+    // Type | Tenant Name | Tenant Unit | Tenant Code | Effective Date | Primary Space | Transfer To Space | Submitter | Other Notes | Submission Date
     const row = [
       data.type || '',
       data.tenantName || '',
       data.tenantUnit || '',
-      data.property || '',
+      data.tenantCode || '',
       data.effectiveDate || '',
       data.primarySpace || '',
       data.transferToSpace || '',
@@ -112,13 +112,13 @@ function doGet(e) {
       let rowToDelete = -1;
       
       // Search from bottom to top (most recent first) to find matching row
-      // Columns: Type(0), Tenant Name(1), Tenant Unit(2), Tenant Code(3), Property(4), 
-      //          Effective Date(5), Primary Space(6), Transfer To(7), Submitter(8), Notes(9), Date(10)
+      // Columns: Type(0), Tenant Name(1), Tenant Unit(2), Tenant Code(3), Effective Date(4),
+      //          Primary Space(5), Transfer To(6), Submitter(7), Notes(8), Submission Date(9)
       for (let i = data.length - 1; i >= 1; i--) {
         const row = data[i];
         if (row[0] === searchType && 
             row[1] === searchTenantName && 
-            row[6] === searchPrimarySpace) {
+            row[5] === searchPrimarySpace) {
           rowToDelete = i + 1; // Sheet rows are 1-indexed
           break;
         }
@@ -156,14 +156,13 @@ function doGet(e) {
       params.type || '',
       params.tenantName || '',
       params.tenantUnit || '',
-      params.tenantCode || '',  // Tenant Code (empty, filled from master)
-      params.property || '',
+      params.tenantCode || '',
       params.effectiveDate || '',
       params.primarySpace || '',
       params.transferToSpace || '',
       params.submitter || '',
       params.otherNotes || '',
-      centralTime  // Date and Time in Central timezone
+      centralTime  // Submission Date in Central timezone
     ];
     
     sheet.appendRow(row);
