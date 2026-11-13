@@ -28,7 +28,7 @@ export const permissions = {
 
   // Parking change requests
   canSubmitChangeRequest: (role: UserRole | null): boolean => 
-    role === 'admin' || role === 'leasing_agent',
+    role !== null,
 
   // User management
   canManageUsers: (role: UserRole | null): boolean => 

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/components/auth-provider';
+import { permissions } from '@/lib/permissions';
 import { WaitlistEntry } from '@/types/database';
 import { AddEntryForm } from '@/components/add-entry-form';
 import { WaitlistTable } from '@/components/waitlist-table';
@@ -48,7 +49,7 @@ interface SheetUnit {
 }
 
 export default function WaitlistPage() {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, userRole } = useAuth();
   const router = useRouter();
   const [entries, setEntries] = useState<WaitlistEntry[]>([]);
   const [sheetUnits, setSheetUnits] = useState<SheetUnit[]>([]);
@@ -110,6 +111,14 @@ export default function WaitlistPage() {
       router.push('/login');
     }
   }, [user, authLoading, router]);
+
+  const isBlockedRole = userRole !== null && !permissions.canAccessWaitlist(userRole);
+
+  useEffect(() => {
+    if (isBlockedRole) {
+      router.replace('/');
+    }
+  }, [isBlockedRole, router]);
 
   // Auto-check for match alerts on login (silently in background)
   useEffect(() => {
@@ -200,7 +209,7 @@ export default function WaitlistPage() {
     );
   }
 
-  if (!user) {
+  if (!user || isBlockedRole) {
     return null;
   }
 
