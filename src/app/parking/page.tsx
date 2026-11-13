@@ -52,6 +52,8 @@ interface ParkingSpot {
   future_unit_number: string | null;
   future_start_date: string | null;
   has_future_tenant: boolean;
+  moved_out_tenant_name?: string | null;
+  move_out_date?: string | null;
   // Reservation info
   reservation_id: string | null;
   reserved_for_applicant: string | null;
@@ -986,6 +988,12 @@ export default function ParkingPage() {
                                   {spot.unit_number || <span className="text-muted-foreground">—</span>}
                                 </TableCell>
                                 <TableCell className="text-sm">
+                                  {spot.moved_out_tenant_name && (
+                                    <div className="mb-1 text-xs text-muted-foreground" title="Resident is Past in the Directory. A Termination is sent to OUTPUT automatically.">
+                                      Moved out: {spot.moved_out_tenant_name}
+                                      {spot.move_out_date && ` · ${new Date(spot.move_out_date + 'T00:00:00').toLocaleDateString()}`}
+                                    </div>
+                                  )}
                                   {spot.tenant_code ? (
                                     <div className="flex items-center gap-2">
                                       <div>

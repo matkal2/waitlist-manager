@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { runWaitlistCleanup } from '@/lib/waitlist-cleanup';
+import { runParkingAutoMoveOuts } from '@/lib/parking-auto-moveout';
 
-// Called daily by Vercel Cron (see vercel.json): sends match alerts, then archives/purges expired entries
+// Called daily by Vercel Cron (see vercel.json): sends match alerts, archives/purges expired entries,
+// and terminates parking for residents the Directory lists as Past
 
 export async function GET(request: Request) {
   // Verify the request is from Vercel Cron (in production)
@@ -30,12 +32,21 @@ export async function GET(request: Request) {
       cleanup = { error: String(cleanupError) };
     }
 
+    let parkingMoveOuts: unknown;
+    try {
+      parkingMoveOuts = await runParkingAutoMoveOuts(baseUrl);
+    } catch (moveOutError) {
+      console.error('Cron parking move-out error:', moveOutError);
+      parkingMoveOuts = { error: String(moveOutError) };
+    }
+
     return NextResponse.json({
       success: true,
       triggeredAt: new Date().toISOString(),
       source: 'cron',
       result,
       cleanup,
+      parkingMoveOuts,
     });
   } catch (error) {
     console.error('Cron match-alerts error:', error);

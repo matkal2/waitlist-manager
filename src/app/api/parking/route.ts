@@ -32,6 +32,11 @@ interface ParkingSpot {
   future_unit_number: string | null;
   future_start_date: string | null;
   has_future_tenant: boolean;
+  // Resident the Directory lists as Past (moved out) who is still on this spot in Import
+  moved_out_tenant_code: string | null;
+  moved_out_tenant_name: string | null;
+  moved_out_unit: string | null;
+  move_out_date: string | null;
   // Reservation info (for applicants in screening)
   reservation_id: string | null;
   reserved_for_applicant: string | null;
@@ -43,6 +48,8 @@ interface ParkingSpot {
 interface DirectoryEntry {
   residentName: string;
   unitNumber: string | null;
+  status: string;
+  moveOutDate: string | null;
 }
 
 function parseGoogleDate(dateStr: string | null): string | null {
@@ -155,8 +162,11 @@ async function fetchDirectory(): Promise<Map<string, DirectoryEntry>> {
       }
     }
     
+    const status = cells[8]?.v?.toString() || '';
+    const moveOutDate = parseGoogleDate(cells[13]?.v?.toString() || null);
+
     if (tenantCode && residentName) {
-      directoryMap.set(tenantCode, { residentName, unitNumber });
+      directoryMap.set(tenantCode, { residentName, unitNumber, status, moveOutDate });
     }
   }
   
@@ -298,6 +308,10 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
           future_unit_number: futureEntry?.unitNumber || null,
           future_start_date: leaseStartDate,
           has_future_tenant: true,
+          moved_out_tenant_code: null,
+          moved_out_tenant_name: null,
+          moved_out_unit: null,
+          move_out_date: null,
           reservation_id: null,
           reserved_for_applicant: null,
           reserved_for_unit: null,
@@ -345,7 +359,7 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
     }
     
     // Determine actual status
-    const status = determineStatus(rawStatus, terminationDate, currentLeaseIsFuture ? null : tenantCode, leaseStartDate);
+    let status = determineStatus(rawStatus, terminationDate, currentLeaseIsFuture ? null : tenantCode, leaseStartDate);
     
     // For current tenant display, don't show if their lease hasn't started yet
     const effectiveTenantCode = currentLeaseIsFuture ? null : tenantCode;
@@ -357,12 +371,22 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
     // For Notice spots, available date is the day after termination
     // For Vacant spots, use the available date from sheet or today
     let effectiveAvailableDate: string | null = null;
-    if (status === 'Notice' && terminationDate) {
-      const nextDay = new Date(terminationDate);
+    let effectiveTerminationDate = terminationDate;
+    let movedOut: { code: string; name: string; unit: string | null; date: string } | null = null;
+    // Resident marked Past in the Directory: the spot frees up on their move-out date
+    if (effectiveTenantCode && directoryEntry && directoryEntry.status.toLowerCase() === 'past' && status !== 'Reserved') {
+      const moveOut = directoryEntry.moveOutDate || terminationDate || today.toISOString().split('T')[0];
+      movedOut = { code: effectiveTenantCode, name: directoryEntry.residentName, unit: directoryEntry.unitNumber, date: moveOut };
+      effectiveTerminationDate = moveOut;
+      status = new Date(moveOut + 'T00:00:00') >= today ? 'Notice' : 'Vacant';
+    }
+    const vacatedByMoveOut = !!movedOut && status === 'Vacant';
+    if (status === 'Notice' && effectiveTerminationDate) {
+      const nextDay = new Date(effectiveTerminationDate);
       nextDay.setDate(nextDay.getDate() + 1);
       effectiveAvailableDate = nextDay.toISOString().split('T')[0];
     } else if (status === 'Vacant') {
-      effectiveAvailableDate = availableDate || new Date().toISOString().split('T')[0];
+      effectiveAvailableDate = (!vacatedByMoveOut && availableDate) || new Date().toISOString().split('T')[0];
     }
     
     // Check if there's a future tenant for this spot from a separate FUTURE row
@@ -399,11 +423,11 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
       full_space_code: fullSpaceCode,
       monthly_rent: monthlyRent,
       status,
-      tenant_code: effectiveTenantCode,
-      tenant_name: tenantName,
-      unit_number: unitNumber,
-      lease_start_date: currentLeaseIsFuture ? null : leaseStartDate,
-      termination_date: terminationDate,
+      tenant_code: vacatedByMoveOut ? null : effectiveTenantCode,
+      tenant_name: vacatedByMoveOut ? null : tenantName,
+      unit_number: vacatedByMoveOut ? null : unitNumber,
+      lease_start_date: currentLeaseIsFuture || vacatedByMoveOut ? null : leaseStartDate,
+      termination_date: effectiveTerminationDate,
       available_date: effectiveAvailableDate,
       has_ev_charging: hasEvCharging,
       is_handicap: isHandicap,
@@ -413,6 +437,10 @@ async function fetchParkingSpots(directoryMap: Map<string, DirectoryEntry>): Pro
       future_unit_number: futureUnitNumber,
       future_start_date: effectiveFutureStartDate,
       has_future_tenant: hasFutureTenant,
+      moved_out_tenant_code: movedOut?.code || null,
+      moved_out_tenant_name: movedOut?.name || null,
+      moved_out_unit: movedOut?.unit || null,
+      move_out_date: movedOut?.date || null,
       reservation_id: null,
       reserved_for_applicant: null,
       reserved_for_unit: null,
