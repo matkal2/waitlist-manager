@@ -173,8 +173,6 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
   const openAssign = (entry: ParkingWaitlist, spot?: MatchableSpot) => {
     if (!onAssign) return;
     const isUpgrade = entry.waitlist_type === 'Indoor Upgrade';
-    const today = new Date().toISOString().split('T')[0];
-    const available = spot && spot.status !== 'Vacant' ? (spot.available_date || today).split('T')[0] : today;
     const tenant = directory.find(d =>
       normalizePersonName(d.residentName) === normalizePersonName(entry.tenant_name) &&
       (!d.unitNumber || d.unitNumber === entry.unit_number)
@@ -187,7 +185,6 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
       unit: entry.unit_number,
       primarySpace: isUpgrade ? resolveSpotCode(entry, entry.current_spot_number) : spot?.full_space_code || '',
       transferToSpace: isUpgrade ? spot?.full_space_code || '' : '',
-      effectiveDate: spot ? (available > today ? available : today) : '',
       notes: `Assigned from parking waitlist (${entry.waitlist_type})`,
     });
   };
@@ -664,7 +661,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
                       {onAssign && (entry.status === 'Active' || entry.status === 'Offered') && (
-                        <Button size="sm" className="h-7" onClick={() => openAssign(entry)} title="Open a pre-filled change request">
+                        <Button size="sm" variant="outline" className="h-7 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300" onClick={() => openAssign(entry)} title="Open a pre-filled change request">
                           <CheckCircle className="h-3.5 w-3.5 mr-1" />
                           Assign
                         </Button>
@@ -733,7 +730,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                                     <span className={`text-xs ${rank === 1 ? 'font-medium text-green-700' : 'text-muted-foreground'}`}>
                                       {rank === 1 ? 'First in line' : `#${rank} in line`}
                                     </span>
-                                    <Button size="sm" className="ml-auto h-7" onClick={() => openAssign(entry, spot)}>
+                                    <Button size="sm" variant="outline" className="ml-auto h-7 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300" onClick={() => openAssign(entry, spot)}>
                                       <CheckCircle className="h-3.5 w-3.5 mr-1" />
                                       Assign
                                     </Button>

@@ -97,6 +97,9 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
   const [primarySpace, setPrimarySpace] = useState(prefill?.primarySpace || '');
   const [transferToSpace, setTransferToSpace] = useState(prefill?.transferToSpace || '');
   const [otherNotes, setOtherNotes] = useState(prefill?.notes || '');
+  // Spots chosen before opening (from the parking waitlist) stay fixed
+  const lockedPrimary = !!prefill?.primarySpace && changeType === prefill.changeType;
+  const lockedTransferTo = !!prefill?.transferToSpace && changeType === prefill.changeType;
 
   // Directory state for tenant autocomplete
   const [directory, setDirectory] = useState<{ tenantCode: string; residentName: string; unitNumber?: string; property?: string }[]>([]);
@@ -639,13 +642,15 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                       <button
                         key={spot.id}
                         type="button"
+                        disabled={lockedPrimary && primarySpace !== spot.full_space_code}
                         onClick={() => {
+                          if (lockedPrimary) return;
                           setPrimarySpace(spot.full_space_code);
                           // Keep the tenant's own property (a 546 resident may hold a shared 440 spot)
                           if (!selectedProperty) setSelectedProperty(spot.property);
                           setValidationErrors(prev => ({ ...prev, primarySpace: '', property: '' }));
                         }}
-                        className={`px-2 py-1 rounded border text-xs font-medium transition-all ${
+                        className={`px-2 py-1 rounded border text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
                           primarySpace === spot.full_space_code
                             ? changeType === 'Termination'
                               ? 'bg-red-600 text-white border-red-600'
@@ -736,10 +741,10 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                 onChange={(e) => {
                   setEffectiveDate(e.target.value);
                   // Reset space selections when date changes (available spots may change)
-                  if (changeType === 'Add') {
+                  if (changeType === 'Add' && !lockedPrimary) {
                     setPrimarySpace('');
                   }
-                  if (changeType === 'Transfer') {
+                  if (changeType === 'Transfer' && !lockedTransferTo) {
                     // Only reset Transfer To, keep Primary Space (tenant's existing spot)
                     setTransferToSpace('');
                   }
@@ -781,6 +786,9 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                     </Button>
                   )}
                 </div>
+                {lockedPrimary ? (
+                  <Input value={primarySpace} disabled className="bg-muted" />
+                ) : (
                 <Select
                   value={primarySpace}
                   onValueChange={(value) => handleSpotSelection(value, false)}
@@ -817,6 +825,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                     ))}
                   </SelectContent>
                 </Select>
+                )}
                 {validationErrors.primarySpace && (
                   <p className="text-sm text-red-500 mt-1">{validationErrors.primarySpace}</p>
                 )}
@@ -983,6 +992,9 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
           {changeType === 'Transfer' && (
             <div>
               <Label>Transfer To Space * <span className="text-xs text-muted-foreground">(Available spots)</span></Label>
+              {lockedTransferTo ? (
+                <Input value={transferToSpace} disabled className="bg-muted" />
+              ) : (
               <Select
                 value={transferToSpace}
                 onValueChange={(value) => handleSpotSelection(value, true)}
@@ -1011,6 +1023,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                   ))}
                 </SelectContent>
               </Select>
+              )}
               {validationErrors.transferToSpace && (
                 <p className="text-sm text-red-500 mt-1">{validationErrors.transferToSpace}</p>
               )}
