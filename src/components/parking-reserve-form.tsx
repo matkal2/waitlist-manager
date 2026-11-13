@@ -33,15 +33,37 @@ interface ParkingSpot {
   status: string;
 }
 
+interface InventoryUnitSource {
+  property: string;
+  unit_number?: string | null;
+  future_unit_number?: string | null;
+}
+
+interface DirectoryEntry {
+  unitNumber?: string;
+  property?: string;
+}
+
+// Static unit lists use a few legacy property names
+const UNIT_LIST_ALIASES: Record<string, string> = {
+  'North Clark': 'N. Clark',
+  'West Chicago': 'W. Chicago',
+  'West Montrose': 'W. Montrose',
+};
+
+// "8465-204" -> "8465"; plain unit numbers have no building prefix
+const buildingPrefix = (unit: string) => (unit.includes('-') ? unit.split('-')[0] : null);
+
 interface ParkingReserveFormProps {
   spot: ParkingSpot | null;
+  spots?: InventoryUnitSource[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   reservedBy: string;
 }
 
-export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess, reservedBy }: ParkingReserveFormProps) {
+export function ParkingReserveForm({ spot, spots = [], open, onOpenChange, onSuccess, reservedBy }: ParkingReserveFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -62,8 +84,43 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess, reserv
     setFormData(prev => ({ ...prev, unit_number: '' }));
   }, [spot?.property, spot?.full_space_code]);
 
-  // Get units for the applicant's property from the static PROPERTY_UNITS mapping
-  const units = applicantProperty ? (PROPERTY_UNITS[applicantProperty] || []) : [];
+  const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
+  useEffect(() => {
+    if (open && directory.length === 0) {
+      fetch('/api/directory')
+        .then(res => res.json())
+        .then(data => setDirectory(data.directory || []))
+        .catch(err => console.error('Failed to load directory:', err));
+    }
+  }, [open, directory.length]);
+
+  // Unit suggestions: static list + units already parking in this lot + Directory units in the same
+  // buildings (e.g. the Grand lot serves the 8465-8471 buildings, which the Directory files under Green Bay 546)
+  const units = (() => {
+    if (!applicantProperty || !spot) return [];
+    const result = new Set<string>(PROPERTY_UNITS[UNIT_LIST_ALIASES[applicantProperty] || applicantProperty] || []);
+    const isOwnLot = applicantProperty === spot.property;
+    const prefixes = new Set<string>();
+    if (isOwnLot) {
+      spots
+        .filter(s => s.property === spot.property)
+        .flatMap(s => [s.unit_number, s.future_unit_number])
+        .forEach(unit => {
+          if (!unit) return;
+          result.add(unit);
+          const prefix = buildingPrefix(unit);
+          if (prefix) prefixes.add(prefix);
+        });
+    }
+    directory.forEach(entry => {
+      if (!entry.unitNumber) return;
+      const prefix = buildingPrefix(entry.unitNumber);
+      const sameBuilding = prefix !== null && prefixes.has(prefix);
+      const sameProperty = entry.property === applicantProperty && (prefixes.size === 0 || !prefix || sameBuilding);
+      if (sameBuilding || sameProperty) result.add(entry.unitNumber);
+    });
+    return [...result].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  })();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,21 +251,20 @@ export function ParkingReserveForm({ spot, open, onOpenChange, onSuccess, reserv
                 <Home className="h-3 w-3" />
                 Unit Number *
               </Label>
-              <Select
+<Input
+                id="unit_number"
+                list="reserve-unit-options"
                 value={formData.unit_number}
-                onValueChange={(value) => setFormData({ ...formData, unit_number: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  {units.map((unit) => (
-                    <SelectItem key={unit} value={unit}>
-                      {unit}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(e) => setFormData({ ...formData, unit_number: e.target.value })}
+                placeholder={units.length > 0 ? 'Select or type unit' : 'Type unit number'}
+                autoComplete="off"
+                required
+              />
+              <datalist id="reserve-unit-options">
+                {units.map((unit) => (
+                  <option key={unit} value={unit} />
+                ))}
+              </datalist>
             </div>
           </div>
           

@@ -116,6 +116,8 @@ export default function ParkingPage() {
   // Filters
   const [activeTab, setActiveTab] = useState<string>('inventory');
   const [propertyFilter, setPropertyFilter] = useState<string>('');
+  const [upcomingProperty, setUpcomingProperty] = useState<string | null>(null);
+  const [trackingProperty, setTrackingProperty] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -440,6 +442,14 @@ export default function ParkingPage() {
     } finally {
       setRevertingId(null);
     }
+  };
+
+  // Admins can undo/restore any change; everyone else only their own
+  const canModifyChange = (change: ParkingChange) => {
+    if (userRole === 'admin') return true;
+    const submitter = (change.submitter || '').trim().toLowerCase();
+    if (!submitter) return false;
+    return [userFullName, user?.email].some(id => id && id.trim().toLowerCase() === submitter);
   };
 
   // Check if a reverted change can be undone (within 24 hours)
@@ -1169,7 +1179,7 @@ export default function ParkingPage() {
                   <div>
                     <CardTitle>Parking Waitlist</CardTitle>
                     <CardDescription>
-                      Priority: 1st Spot → Indoor Upgrade → 2nd Spot (FIFO within each type)
+                      Click a property to see its waitlist in priority order
                     </CardDescription>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => fetchData(false)} disabled={loading}>
@@ -1420,7 +1430,7 @@ export default function ParkingPage() {
                                 )}
                               </TableCell>
                               <TableCell>
-                                {!activity.reverted ? (
+                                {!canModifyChange(activity) ? null : !activity.reverted ? (
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -1494,9 +1504,12 @@ export default function ParkingPage() {
               <CardContent>
                 {(() => {
                   // Get all spots on Notice with termination dates, sorted by date
-                  const upcomingSpots = spots
+                  const allUpcomingSpots = spots
                     .filter(s => s.status === 'Notice' && s.termination_date)
                     .sort((a, b) => new Date(a.termination_date!).getTime() - new Date(b.termination_date!).getTime());
+                  const upcomingSpots = upcomingProperty
+                    ? allUpcomingSpots.filter(s => s.property === upcomingProperty)
+                    : allUpcomingSpots;
                   
                   // Group by month
                   const groupedByMonth: Record<string, ParkingSpot[]> = {};
@@ -1524,7 +1537,7 @@ export default function ParkingPage() {
                       );
                   };
 
-                  if (upcomingSpots.length === 0) {
+                  if (allUpcomingSpots.length === 0) {
                     return (
                       <div className="text-center py-12 text-muted-foreground">
                         <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -1536,34 +1549,78 @@ export default function ParkingPage() {
 
                   return (
                     <div className="space-y-6">
-                      {/* Summary Stats */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="p-4 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200">
-                          <div className="text-2xl font-bold text-orange-600">{upcomingSpots.length}</div>
-                          <div className="text-sm text-muted-foreground">Total Upcoming</div>
-                        </div>
-                        <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200">
-                          <div className="text-2xl font-bold text-blue-600">
-                            {upcomingSpots.filter(s => s.spot_type === 'Indoor').length}
-                          </div>
-                          <div className="text-sm text-muted-foreground">Indoor</div>
-                        </div>
-                        <div className="p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200">
-                          <div className="text-2xl font-bold text-green-600">
-                            {upcomingSpots.filter(s => s.spot_type === 'Outdoor').length}
-                          </div>
-                          <div className="text-sm text-muted-foreground">Outdoor</div>
-                        </div>
-                        <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200">
-                          <div className="text-2xl font-bold text-purple-600">
-                            {upcomingSpots.filter(s => getWaitlistMatches(s).length > 0).length}
-                          </div>
-                          <div className="text-sm text-muted-foreground">With Waitlist Match</div>
+                      {/* Summary cards (selected property, or all properties) */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {[
+                          { label: 'Upcoming spots', value: upcomingSpots.length, icon: Calendar, tone: 'text-orange-600', iconBg: 'bg-orange-50 dark:bg-orange-950' },
+                          { label: 'Indoor', value: upcomingSpots.filter(s => s.spot_type === 'Indoor').length, icon: Building2, tone: 'text-blue-600', iconBg: 'bg-blue-50 dark:bg-blue-950' },
+                          { label: 'Outdoor', value: upcomingSpots.filter(s => s.spot_type === 'Outdoor').length, icon: Car, tone: 'text-green-600', iconBg: 'bg-green-50 dark:bg-green-950' },
+                          { label: 'With waitlist match', value: upcomingSpots.filter(s => getWaitlistMatches(s).length > 0).length, icon: Users, tone: 'text-purple-600', iconBg: 'bg-purple-50 dark:bg-purple-950' },
+                        ].map(card => {
+                          const Icon = card.icon;
+                          return (
+                            <div key={card.label} className="flex items-center gap-4 rounded-xl border bg-white dark:bg-gray-900 p-4 shadow-sm">
+                              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${card.iconBg}`}>
+                                <Icon className={`h-5 w-5 ${card.tone}`} />
+                              </div>
+                              <div>
+                                <div className="text-2xl font-semibold tabular-nums leading-tight">{card.value}</div>
+                                <div className="text-sm text-muted-foreground">{card.label}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Property tiles: click to open, click again to close */}
+                      <div>
+                        <h3 className="mb-2 text-sm font-medium text-muted-foreground">Properties</h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
+                          {properties.map(prop => {
+                            const propUpcoming = allUpcomingSpots.filter(s => s.property === prop);
+                            const matched = propUpcoming.filter(s => getWaitlistMatches(s).length > 0).length;
+                            const active = upcomingProperty === prop;
+                            return (
+                              <button
+                                key={prop}
+                                type="button"
+                                onClick={() => setUpcomingProperty(active ? null : prop)}
+                                className={`flex flex-col items-center rounded-xl border px-3 py-4 text-center shadow-sm transition-all ${active ? 'border-blue-600 bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-gray-900 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md'} ${propUpcoming.length === 0 && !active ? 'opacity-60' : ''}`}
+                              >
+                                <span className={`max-w-full truncate text-sm font-medium ${active ? 'text-blue-50' : 'text-muted-foreground'}`} title={prop}>{prop}</span>
+                                <span className={`mt-2 text-4xl font-bold tabular-nums leading-none ${active ? 'text-white' : 'text-gray-900 dark:text-gray-50'}`}>{propUpcoming.length}</span>
+                                <span className={`mt-1 text-xs ${active ? 'text-blue-100' : 'text-muted-foreground'}`}>upcoming</span>
+                                <span className={`mt-3 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium ${matched > 0 ? (active ? 'bg-white/20 text-white' : 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300') : (active ? 'text-blue-100' : 'text-muted-foreground')}`}>
+                                  {matched > 0 ? `${matched} with match` : 'No matches'}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
 
+                      {upcomingProperty && (
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-semibold">
+                            {upcomingProperty}
+                            <span className="ml-2 text-sm font-normal text-muted-foreground">
+                              {upcomingSpots.length} upcoming {upcomingSpots.length === 1 ? 'spot' : 'spots'} · soonest first
+                            </span>
+                          </h3>
+                          <Button variant="ghost" size="sm" onClick={() => setUpcomingProperty(null)}>Close</Button>
+                        </div>
+                      )}
+
                       {/* Timeline by Month */}
-                      {Object.entries(groupedByMonth).map(([month, monthSpots]) => (
+                      {!upcomingProperty ? (
+                        <div className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+                          Select a property above to see its upcoming spots and waitlist matches.
+                        </div>
+                      ) : upcomingSpots.length === 0 ? (
+                        <div className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+                          No spots on notice at {upcomingProperty}.
+                        </div>
+                      ) : Object.entries(groupedByMonth).map(([month, monthSpots]) => (
                         <div key={month} className="border rounded-lg overflow-hidden">
                           <div className="bg-muted/50 px-4 py-2 font-semibold flex items-center justify-between">
                             <span>{month}</span>
@@ -1703,18 +1760,6 @@ export default function ParkingPage() {
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Select value={propertyFilter} onValueChange={setPropertyFilter}>
-                      <SelectTrigger className="w-[200px]">
-                        <Building2 className="h-4 w-4 mr-2" />
-                        <SelectValue placeholder="Select property" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Properties</SelectItem>
-                        {properties.map(prop => (
-                          <SelectItem key={prop} value={prop}>{prop}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                     <Button variant="outline" size="sm" onClick={() => fetchData(false)} disabled={loading}>
                       <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
@@ -1730,11 +1775,11 @@ export default function ParkingPage() {
                   <div className="space-y-6">
                     {/* Property-filtered stats */}
                     {(() => {
-                      const filteredForTracking = propertyFilter && propertyFilter !== 'all' 
-                        ? spots.filter(s => s.property === propertyFilter)
+                      const filteredForTracking = trackingProperty !== 'all' 
+                        ? spots.filter(s => s.property === trackingProperty)
                         : spots;
-                      const waitlistFiltered = propertyFilter && propertyFilter !== 'all'
-                        ? waitlist.filter(w => w.property === propertyFilter && w.status === 'Active')
+                      const waitlistFiltered = trackingProperty !== 'all'
+                        ? waitlist.filter(w => w.property === trackingProperty && w.status === 'Active')
                         : waitlist.filter(w => w.status === 'Active');
                       
                       const totalSpots = filteredForTracking.length;
@@ -1751,56 +1796,74 @@ export default function ParkingPage() {
                       
                       return (
                         <>
-                          {/* Main KPI Cards */}
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200">
-                              <CardHeader className="pb-2">
-                                <CardDescription className="text-blue-700 dark:text-blue-300">Total Spots</CardDescription>
-                                <CardTitle className="text-3xl text-blue-900 dark:text-blue-100">{totalSpots}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="pt-0">
-                                <p className="text-xs text-blue-600 dark:text-blue-400">
-                                  {indoorSpots.length} indoor • {outdoorSpots.length} outdoor
-                                </p>
-                              </CardContent>
-                            </Card>
-                            
-                            <Card className={`bg-gradient-to-br ${occupancyRate >= 90 ? 'from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200' : occupancyRate >= 70 ? 'from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 border-yellow-200' : 'from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border-red-200'}`}>
-                              <CardHeader className="pb-2">
-                                <CardDescription className={occupancyRate >= 90 ? 'text-green-700' : occupancyRate >= 70 ? 'text-yellow-700' : 'text-red-700'}>Occupancy Rate</CardDescription>
-                                <CardTitle className={`text-3xl flex items-center gap-2 ${occupancyRate >= 90 ? 'text-green-900' : occupancyRate >= 70 ? 'text-yellow-900' : 'text-red-900'}`}>
-                                  <TrendingUp className="h-5 w-5" />
-                                  {occupancyRate}%
-                                </CardTitle>
-                              </CardHeader>
-                              <CardContent className="pt-0">
-                                <p className={`text-xs ${occupancyRate >= 90 ? 'text-green-600' : occupancyRate >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                  {occupiedSpots} of {totalSpots} occupied
-                                </p>
-                              </CardContent>
-                            </Card>
-                            
-                            <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border-orange-200">
-                              <CardHeader className="pb-2">
-                                <CardDescription className="text-orange-700 dark:text-orange-300">Available Now</CardDescription>
-                                <CardTitle className="text-3xl text-orange-900 dark:text-orange-100">{vacantSpots}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="pt-0">
-                                <p className="text-xs text-orange-600 dark:text-orange-400">
-                                  {indoorVacant} indoor • {outdoorVacant} outdoor
-                                </p>
-                              </CardContent>
-                            </Card>
-                            
-                            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200">
-                              <CardHeader className="pb-2">
-                                <CardDescription className="text-purple-700 dark:text-purple-300">Upcoming Vacancy</CardDescription>
-                                <CardTitle className="text-3xl text-purple-900 dark:text-purple-100">{noticeSpots}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="pt-0">
-                                <p className="text-xs text-purple-600 dark:text-purple-400">On notice / terminating</p>
-                              </CardContent>
-                            </Card>
+                          {/* Property tiles: click to focus a property, click again for all */}
+                          <div>
+                            <h3 className="mb-2 text-sm font-medium text-muted-foreground">Properties</h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
+                              {properties.map(prop => {
+                                const propSpots = spots.filter(s => s.property === prop);
+                                const propOccupied = propSpots.filter(s => s.status === 'Occupied').length;
+                                const propVacant = propSpots.filter(s => s.status === 'Vacant').length;
+                                const propNotice = propSpots.filter(s => s.status === 'Notice').length;
+                                // Occupancy: (Occupied + Notice) / (Occupied + Vacant + Notice) - excludes Reserved/Future
+                                const propActiveSpots = propOccupied + propVacant + propNotice;
+                                const propOccupancy = propActiveSpots > 0 ? Math.round(((propOccupied + propNotice) / propActiveSpots) * 100) : 0;
+                                const propWaitlist = waitlist.filter(w => w.property === prop && w.status === 'Active').length;
+                                const active = trackingProperty === prop;
+                                return (
+                                  <button
+                                    key={prop}
+                                    type="button"
+                                    onClick={() => setTrackingProperty(active ? 'all' : prop)}
+                                    className={`flex flex-col items-center rounded-xl border px-3 py-4 text-center shadow-sm transition-all ${active ? 'border-blue-600 bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-gray-900 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md'}`}
+                                  >
+                                    <span className={`max-w-full truncate text-sm font-medium ${active ? 'text-blue-50' : 'text-muted-foreground'}`} title={prop}>{prop}</span>
+                                    <span className={`mt-2 text-4xl font-bold tabular-nums leading-none ${active ? 'text-white' : propOccupancy >= 90 ? 'text-green-700 dark:text-green-400' : propOccupancy >= 70 ? 'text-yellow-700 dark:text-yellow-400' : 'text-red-700 dark:text-red-400'}`}>{propOccupancy}%</span>
+                                    <span className={`mt-1 text-xs ${active ? 'text-blue-100' : 'text-muted-foreground'}`}>occupied · {propSpots.length} spots</span>
+                                    <span className={`mt-2 text-xs ${active ? 'text-blue-100' : 'text-muted-foreground'}`}>{propVacant} vacant · {propNotice} notice</span>
+                                    <span className={`mt-2 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium ${propWaitlist > 0 ? (active ? 'bg-white/20 text-white' : 'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300') : (active ? 'text-blue-100' : 'text-muted-foreground')}`}>
+                                      {propWaitlist > 0 ? `${propWaitlist} on waitlist` : 'No waitlist'}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-semibold">
+                              {trackingProperty === 'all' ? 'All properties' : trackingProperty}
+                              {trackingProperty === 'all' && (
+                                <span className="ml-2 text-sm font-normal text-muted-foreground">Select a property above to focus on it</span>
+                              )}
+                            </h3>
+                            {trackingProperty !== 'all' && (
+                              <Button variant="ghost" size="sm" onClick={() => setTrackingProperty('all')}>Show all</Button>
+                            )}
+                          </div>
+
+                          {/* Main KPI cards */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {[
+                              { label: 'Total spots', value: `${totalSpots}`, sub: `${indoorSpots.length} indoor · ${outdoorSpots.length} outdoor`, icon: ParkingCircle, tone: 'text-blue-600', iconBg: 'bg-blue-50 dark:bg-blue-950' },
+                              { label: 'Occupancy rate', value: `${occupancyRate}%`, sub: `${occupiedSpots} of ${totalSpots} occupied`, icon: TrendingUp, tone: occupancyRate >= 90 ? 'text-green-600' : occupancyRate >= 70 ? 'text-yellow-600' : 'text-red-600', iconBg: occupancyRate >= 90 ? 'bg-green-50 dark:bg-green-950' : occupancyRate >= 70 ? 'bg-yellow-50 dark:bg-yellow-950' : 'bg-red-50 dark:bg-red-950' },
+                              { label: 'Available now', value: `${vacantSpots}`, sub: `${indoorVacant} indoor · ${outdoorVacant} outdoor`, icon: CheckCircle, tone: 'text-orange-600', iconBg: 'bg-orange-50 dark:bg-orange-950' },
+                              { label: 'Upcoming vacancy', value: `${noticeSpots}`, sub: 'On notice / terminating', icon: Calendar, tone: 'text-purple-600', iconBg: 'bg-purple-50 dark:bg-purple-950' },
+                            ].map(card => {
+                              const Icon = card.icon;
+                              return (
+                                <div key={card.label} className="flex items-center gap-4 rounded-xl border bg-white dark:bg-gray-900 p-4 shadow-sm">
+                                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${card.iconBg}`}>
+                                    <Icon className={`h-5 w-5 ${card.tone}`} />
+                                  </div>
+                                  <div>
+                                    <div className="text-2xl font-semibold tabular-nums leading-tight">{card.value}</div>
+                                    <div className="text-sm text-muted-foreground">{card.label}</div>
+                                    <div className="text-xs text-muted-foreground">{card.sub}</div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
 
                           {/* Waitlist & Opportunity Section */}
@@ -1904,67 +1967,6 @@ export default function ParkingPage() {
                             </Card>
                           </div>
 
-                          {/* Property Breakdown (only show when viewing all properties) */}
-                          {(!propertyFilter || propertyFilter === 'all') && (
-                            <Card>
-                              <CardHeader>
-                                <CardTitle className="text-lg flex items-center gap-2">
-                                  <Building2 className="h-5 w-5" />
-                                  Property Breakdown
-                                </CardTitle>
-                              </CardHeader>
-                              <CardContent>
-                                <Table>
-                                  <TableHeader>
-                                    <TableRow>
-                                      <TableHead>Property</TableHead>
-                                      <TableHead className="text-center">Total</TableHead>
-                                      <TableHead className="text-center">Occupied</TableHead>
-                                      <TableHead className="text-center">Vacant</TableHead>
-                                      <TableHead className="text-center">Notice</TableHead>
-                                      <TableHead className="text-center">Occupancy</TableHead>
-                                      <TableHead className="text-center">Waitlist</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {properties.map(prop => {
-                                      const propSpots = spots.filter(s => s.property === prop);
-                                      const propOccupied = propSpots.filter(s => s.status === 'Occupied').length;
-                                      const propVacant = propSpots.filter(s => s.status === 'Vacant').length;
-                                      const propNotice = propSpots.filter(s => s.status === 'Notice').length;
-                                      // Occupancy: (Occupied + Notice) / (Occupied + Vacant + Notice) - excludes Reserved/Future
-                                      const propActiveSpots = propOccupied + propVacant + propNotice;
-                                      const propOccupancy = propActiveSpots > 0 ? Math.round(((propOccupied + propNotice) / propActiveSpots) * 100) : 0;
-                                      const propWaitlist = waitlist.filter(w => w.property === prop && w.status === 'Active').length;
-                                      
-                                      return (
-                                        <TableRow key={prop}>
-                                          <TableCell className="font-medium">{prop}</TableCell>
-                                          <TableCell className="text-center">{propSpots.length}</TableCell>
-                                          <TableCell className="text-center text-green-600">{propOccupied}</TableCell>
-                                          <TableCell className="text-center text-orange-600">{propVacant}</TableCell>
-                                          <TableCell className="text-center text-yellow-600">{propNotice}</TableCell>
-                                          <TableCell className="text-center">
-                                            <Badge className={propOccupancy >= 90 ? 'bg-green-100 text-green-800' : propOccupancy >= 70 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}>
-                                              {propOccupancy}%
-                                            </Badge>
-                                          </TableCell>
-                                          <TableCell className="text-center">
-                                            {propWaitlist > 0 ? (
-                                              <Badge variant="secondary">{propWaitlist}</Badge>
-                                            ) : (
-                                              <span className="text-muted-foreground">-</span>
-                                            )}
-                                          </TableCell>
-                                        </TableRow>
-                                      );
-                                    })}
-                                  </TableBody>
-                                </Table>
-                              </CardContent>
-                            </Card>
-                          )}
-
                           {/* Historical Trends Section */}
                           <Card>
                             <CardHeader>
@@ -1976,7 +1978,7 @@ export default function ParkingPage() {
                                 <Button 
                                   variant="outline" 
                                   size="sm" 
-                                  onClick={() => fetchHistoricalData(propertyFilter)}
+                                  onClick={() => fetchHistoricalData(trackingProperty)}
                                   disabled={trendLoading}
                                 >
                                   {trendLoading ? (
@@ -2081,6 +2083,7 @@ export default function ParkingPage() {
       {/* Reserve Spot Dialog */}
       <ParkingReserveForm
         spot={spotToReserve}
+        spots={spots}
         open={showReserveForm}
         onOpenChange={setShowReserveForm}
         onSuccess={() => fetchData(false)}

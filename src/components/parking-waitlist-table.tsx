@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { Fragment, useState, useEffect, useRef } from 'react';
 import { ParkingWaitlist, ParkingWaitlistType, ParkingWaitlistStatus } from '@/types/database';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, Pencil, Search, Download, X, User } from 'lucide-react';
+import { Plus, Trash2, Pencil, Search, Download, X, User, Users, Car, Warehouse, ParkingCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PROPERTY_UNITS } from '@/lib/property-units';
 
@@ -73,7 +73,8 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('Active');
-  const [propertyFilter, setPropertyFilter] = useState<string>('all');
+  const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   
   // Add/Edit dialog state
@@ -390,7 +391,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
   const exportToCSV = () => {
     const csv = [
       ['Tenant Name', 'Property', 'Unit', 'Waitlist Type', 'Current Spot', 'Status', 'Email', 'Phone', 'Date Added', 'Notes'].join(','),
-      ...filteredEntries.map(e => [
+      ...visibleEntries.map(e => [
         `"${e.tenant_name}"`,
         `"${e.property}"`,
         `"${e.unit_number}"`,
@@ -425,10 +426,10 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
 
   // Select all filtered entries
   const toggleSelectAll = () => {
-    if (selectedIds.size === filteredEntries.length) {
+    if (visibleEntries.length > 0 && visibleEntries.every(e => selectedIds.has(e.id))) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredEntries.map(e => e.id)));
+      setSelectedIds(new Set(visibleEntries.map(e => e.id)));
     }
   };
 
@@ -437,7 +438,6 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
     .filter(entry => {
       if (typeFilter !== 'all' && entry.waitlist_type !== typeFilter) return false;
       if (statusFilter !== 'all' && entry.status !== statusFilter) return false;
-      if (propertyFilter !== 'all' && entry.property !== propertyFilter) return false;
       if (searchTerm) {
         const query = searchTerm.toLowerCase();
         return (
@@ -457,26 +457,167 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
       return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
     });
 
+  const visibleEntries = selectedProperty
+    ? filteredEntries.filter(e => e.property === selectedProperty)
+    : filteredEntries;
+
   // Count by type
   const countByType = (type: ParkingWaitlistType) => 
     entries.filter(e => e.waitlist_type === type && e.status === 'Active').length;
 
+  const activeCount = entries.filter(e => e.status === 'Active').length;
+  const summaryCards: { label: string; value: number; type: string; icon: typeof Users; tone: string; iconBg: string }[] = [
+    { label: 'Active on waitlist', value: activeCount, type: 'all', icon: Users, tone: 'text-blue-600', iconBg: 'bg-blue-50 dark:bg-blue-950' },
+    { label: '1st Spot', value: countByType('1st Spot'), type: '1st Spot', icon: Car, tone: 'text-purple-600', iconBg: 'bg-purple-50 dark:bg-purple-950' },
+    { label: 'Indoor Upgrade', value: countByType('Indoor Upgrade'), type: 'Indoor Upgrade', icon: Warehouse, tone: 'text-teal-600', iconBg: 'bg-teal-50 dark:bg-teal-950' },
+    { label: '2nd Spot', value: countByType('2nd Spot'), type: '2nd Spot', icon: ParkingCircle, tone: 'text-indigo-600', iconBg: 'bg-indigo-50 dark:bg-indigo-950' },
+  ];
+
+  const tileProperties = [...new Set([...properties, ...entries.map(e => e.property)])]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+
+  const daysWaiting = (createdAt: string) =>
+    Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000));
+
+  const hasFilters = searchTerm !== '' || typeFilter !== 'all' || statusFilter !== 'Active';
+
+  const renderList = (list: ParkingWaitlist[], showProperty = false) => (
+    <div className="overflow-x-auto rounded-xl border bg-white dark:bg-gray-900 shadow-sm">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[40px]">
+              <Checkbox
+                checked={list.length > 0 && list.every(e => selectedIds.has(e.id))}
+                onCheckedChange={toggleSelectAll}
+              />
+            </TableHead>
+            <TableHead className="w-[40px]">#</TableHead>
+            <TableHead>Resident</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead className="hidden sm:table-cell">Status</TableHead>
+            <TableHead className="hidden md:table-cell">Waiting</TableHead>
+            <TableHead className="w-[90px] text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {list.map((entry, index) => {
+            const expanded = expandedId === entry.id;
+            return (
+              <Fragment key={entry.id}>
+                <TableRow
+                  className={`cursor-pointer ${selectedIds.has(entry.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                  onClick={() => setExpandedId(expanded ? null : entry.id)}
+                >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedIds.has(entry.id)}
+                      onCheckedChange={() => toggleSelect(entry.id)}
+                    />
+                  </TableCell>
+                  <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {expanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                      <div>
+                        <div className="font-medium">{entry.tenant_name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {showProperty && <span className="mr-1 rounded bg-muted px-1.5 py-0.5">{entry.property}</span>}
+                          Unit {entry.unit_number}
+                        </div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={`${TYPE_COLORS[entry.waitlist_type]} text-white text-xs`}>{entry.waitlist_type}</Badge>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    <Badge className={`${STATUS_COLORS[entry.status]} text-white text-xs`}>{entry.status}</Badge>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                    {daysWaiting(entry.created_at)} days
+                  </TableCell>
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => openEditDialog(entry)} title="Edit">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(entry.id)} className="text-red-500 hover:text-red-700" title="Remove">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+                {expanded && (
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableCell colSpan={7}>
+                      <div className="grid grid-cols-2 gap-4 px-2 py-2 text-sm md:grid-cols-4">
+                        <div>
+                          <div className="text-xs text-muted-foreground">Contact</div>
+                          <div>{entry.phone || 'No phone'}</div>
+                          <div className="break-all">{entry.email || 'No email'}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">Current spot</div>
+                          <div>{entry.current_spot_number || 'None'}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">Preferred type</div>
+                          <div>{entry.preferred_spot_type || 'Any'}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">Added</div>
+                          <div>{formatDateLocal(entry.created_at)}</div>
+                        </div>
+                        <div className="col-span-2 md:col-span-4">
+                          <div className="text-xs text-muted-foreground">Notes</div>
+                          <div className="whitespace-pre-wrap break-words">{entry.notes || 'No notes'}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </Fragment>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* Summary cards (click to filter by type) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {summaryCards.map(card => {
+          const Icon = card.icon;
+          const active = typeFilter === card.type && card.type !== 'all';
+          return (
+            <button
+              key={card.label}
+              type="button"
+              onClick={() => setTypeFilter(active ? 'all' : card.type)}
+              className={`flex items-center gap-4 rounded-xl border bg-white dark:bg-gray-900 p-4 text-left shadow-sm transition hover:shadow-md ${active ? 'border-blue-600 ring-1 ring-blue-600' : ''}`}
+            >
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${card.iconBg}`}>
+                <Icon className={`h-5 w-5 ${card.tone}`} />
+              </div>
+              <div>
+                <div className="text-2xl font-semibold tabular-nums leading-tight">{card.value}</div>
+                <div className="text-sm text-muted-foreground">{card.label}</div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Header with Add button and Export */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-2">
-          <Badge className={`${TYPE_COLORS['1st Spot']} text-white`}>
-            1st Spot: {countByType('1st Spot')}
-          </Badge>
-          <Badge className={`${TYPE_COLORS['Indoor Upgrade']} text-white`}>
-            Indoor: {countByType('Indoor Upgrade')}
-          </Badge>
-          <Badge className={`${TYPE_COLORS['2nd Spot']} text-white`}>
-            2nd Spot: {countByType('2nd Spot')}
-          </Badge>
-        </div>
-        
+        <p className="text-sm text-muted-foreground">
+          Priority: 1st Spot, then Indoor Upgrade, then 2nd Spot. Oldest first within each type.
+        </p>
+
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={exportToCSV}>
             <Download className="h-4 w-4 mr-1" />
@@ -769,10 +910,10 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      {/* Search + filters */}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-white dark:bg-gray-900 p-3 shadow-sm">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by name, unit, or spot..."
             value={searchTerm}
@@ -781,138 +922,108 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
           />
         </div>
         <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="All Types" />
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="All types" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="all">All types</SelectItem>
             {WAITLIST_TYPES.map(type => (
               <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[130px]">
+          <SelectTrigger className="w-[150px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="all">All statuses</SelectItem>
             {STATUSES.map(status => (
               <SelectItem key={status} value={status}>{status}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={propertyFilter} onValueChange={setPropertyFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Properties" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Properties</SelectItem>
-            {properties.map(p => (
-              <SelectItem key={p} value={p}>{p}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={() => { setSearchTerm(''); setTypeFilter('all'); setStatusFilter('Active'); }}>
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+        )}
       </div>
 
-      {/* Table */}
-      <div className="rounded-md border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[40px]">
-                <Checkbox 
-                  checked={filteredEntries.length > 0 && selectedIds.size === filteredEntries.length}
-                  onCheckedChange={toggleSelectAll}
-                />
-              </TableHead>
-              <TableHead className="w-[40px]">#</TableHead>
-              <TableHead>Tenant</TableHead>
-              <TableHead className="hidden md:table-cell">Property / Unit</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead className="hidden sm:table-cell">Current Spot</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="hidden lg:table-cell">Date Added</TableHead>
-              <TableHead className="w-[80px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredEntries.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                  No waitlist entries found
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredEntries.map((entry, index) => (
-                <TableRow key={entry.id} className={selectedIds.has(entry.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}>
-                  <TableCell>
-                    <Checkbox 
-                      checked={selectedIds.has(entry.id)}
-                      onCheckedChange={() => toggleSelect(entry.id)}
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium text-muted-foreground">
-                    {index + 1}
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{entry.tenant_name}</div>
-                      {entry.phone && (
-                        <div className="text-xs text-muted-foreground">{entry.phone}</div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <div>
-                      <div className="font-medium">{entry.property}</div>
-                      <div className="text-xs text-muted-foreground">Unit {entry.unit_number}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`${TYPE_COLORS[entry.waitlist_type]} text-white text-xs`}>
-                      {entry.waitlist_type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    {entry.current_spot_number || '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`${STATUS_COLORS[entry.status]} text-white text-xs`}>
-                      {entry.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                    {formatDateLocal(entry.created_at)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEditDialog(entry)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(entry.id)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-        <div className="px-4 py-2 text-sm text-muted-foreground border-t">
-          Showing {filteredEntries.length} of {entries.length} entries
+      {/* Property tiles: click to open, click again to close */}
+      <div>
+        <h3 className="mb-2 text-sm font-medium text-muted-foreground">Properties</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
+          {tileProperties.map(property => {
+            const list = filteredEntries.filter(e => e.property === property);
+            const firstSpot = list.filter(e => e.waitlist_type === '1st Spot').length;
+            const active = selectedProperty === property;
+            return (
+              <button
+                key={property}
+                type="button"
+                onClick={() => { setSelectedProperty(active ? null : property); setExpandedId(null); }}
+                className={`flex flex-col items-center rounded-xl border px-3 py-4 text-center shadow-sm transition-all ${active ? 'border-blue-600 bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-gray-900 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md'} ${list.length === 0 && !active ? 'opacity-60' : ''}`}
+              >
+                <span className={`max-w-full truncate text-sm font-medium ${active ? 'text-blue-50' : 'text-muted-foreground'}`} title={property}>
+                  {property}
+                </span>
+                <span className={`mt-2 text-4xl font-bold tabular-nums leading-none ${active ? 'text-white' : 'text-gray-900 dark:text-gray-50'}`}>
+                  {list.length}
+                </span>
+                <span className={`mt-1 text-xs ${active ? 'text-blue-100' : 'text-muted-foreground'}`}>on waitlist</span>
+                <span
+                  className={`mt-3 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-xs font-medium ${firstSpot > 0 ? (active ? 'bg-white/20 text-white' : 'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300') : (active ? 'text-blue-100' : 'text-muted-foreground')}`}
+                >
+                  {firstSpot > 0 ? `${firstSpot} need a 1st spot` : 'No 1st spot requests'}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
+
+      {/* Selected property (or search results across properties) */}
+      {selectedProperty ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">
+              {selectedProperty}
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                {visibleEntries.length} {visibleEntries.length === 1 ? 'entry' : 'entries'} · in priority order
+              </span>
+            </h3>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedProperty(null)}>
+              <X className="h-4 w-4 mr-1" />
+              Close
+            </Button>
+          </div>
+          {visibleEntries.length === 0 ? (
+            <div className="rounded-xl border border-dashed py-10 text-center text-muted-foreground">
+              No entries at {selectedProperty} match these filters
+            </div>
+          ) : renderList(visibleEntries)}
+        </div>
+      ) : searchTerm ? (
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold">
+            Search results
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {filteredEntries.length} across all properties
+            </span>
+          </h3>
+          {filteredEntries.length === 0 ? (
+            <div className="rounded-xl border border-dashed py-10 text-center text-muted-foreground">
+              No one matches &ldquo;{searchTerm}&rdquo;
+            </div>
+          ) : renderList(filteredEntries, true)}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+          Select a property above to see its parking waitlist, or search by name.
+        </div>
+      )}
     </div>
   );
 }

@@ -281,6 +281,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
           status: spot.status,
           tenant: spot.tenant_code,
           availableDate: spot.available_date,
+          spotType: spot.spot_type,
           terminationDate: spot.termination_date,
         };
       })
@@ -311,6 +312,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
           spotNumber: parseInt(spotNum.replace(/\D/g, '')) || 0,
           status: spot.status,
           availableDate: spot.available_date,
+          spotType: spot.spot_type,
           terminationDate: spot.termination_date,
         };
       })
@@ -629,7 +631,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                       >
                         {spot.full_space_code}
                         <span className={`ml-1 text-[10px] ${primarySpace === spot.full_space_code ? (changeType === 'Termination' ? 'text-red-200' : 'text-amber-200') : 'text-muted-foreground'}`}>
-                          ({spot.future_tenant_code === tenantCode ? 'Future' : spot.status})
+                          ({spot.spot_type ? `${spot.spot_type}, ` : ''}{spot.future_tenant_code === tenantCode ? 'Future' : spot.status})
                         </span>
                       </button>
                     ) : (
@@ -640,7 +642,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                       >
                         {spot.full_space_code}
                         <span className="ml-1 text-xs text-muted-foreground">
-                          ({spot.future_tenant_code === tenantCode ? 'Future' : spot.status})
+                          ({spot.spot_type ? `${spot.spot_type}, ` : ''}{spot.future_tenant_code === tenantCode ? 'Future' : spot.status})
                         </span>
                       </Badge>
                     )
@@ -771,6 +773,12 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                       <SelectItem key={spot.value} value={spot.label}>
                         <div className="flex items-center gap-2">
                           <span>{spot.label}</span>
+                        {spot.spotType && (
+                          <span className="text-xs text-muted-foreground">{spot.spotType}</span>
+                        )}
+                          {spot.spotType && (
+                            <span className="text-xs text-muted-foreground">{spot.spotType}</span>
+                          )}
                           {spot.property !== selectedProperty && (
                             <Badge variant="outline" className="text-xs bg-sky-50 text-sky-700 border-sky-200">
                               Shared lot
