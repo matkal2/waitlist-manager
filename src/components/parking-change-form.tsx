@@ -42,11 +42,29 @@ interface ParkingSpot {
   future_tenant_code?: string | null;
 }
 
+export interface ChangeFormPrefill {
+  changeType: 'Termination' | 'Add' | 'Transfer';
+  tenantName: string;
+  tenantCode?: string;
+  property: string;
+  unit: string;
+  primarySpace?: string;
+  transferToSpace?: string;
+  effectiveDate?: string;
+  notes?: string;
+}
+
 interface ParkingChangeFormProps {
   onSubmitSuccess: () => void;
   submitterName: string;
   properties: string[];
   spots: ParkingSpot[];
+  // Opens pre-filled (e.g. from a parking waitlist entry); mount with a new key per use
+  prefill?: ChangeFormPrefill | null;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
+  onSubmitted?: () => void | Promise<void>;
 }
 
 type ChangeType = 'Termination' | 'Add' | 'Transfer';
@@ -57,27 +75,32 @@ const CHANGE_TYPES: { value: ChangeType; label: string; description: string }[] 
   { value: 'Transfer', label: 'Transfer', description: 'Move tenant from one spot to another' },
 ];
 
-export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, spots }: ParkingChangeFormProps) {
-  const [open, setOpen] = useState(false);
+export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, spots, prefill, open: openProp, onOpenChange, hideTrigger, onSubmitted }: ParkingChangeFormProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = openProp ?? internalOpen;
+  const setOpen = (value: boolean) => {
+    if (onOpenChange) onOpenChange(value);
+    else setInternalOpen(value);
+  };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showInventoryPreview, setShowInventoryPreview] = useState(false);
   const [previewProperty, setPreviewProperty] = useState('');
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   // Form state
-  const [changeType, setChangeType] = useState<ChangeType | ''>('');
-  const [tenantName, setTenantName] = useState('');
-  const [tenantCode, setTenantCode] = useState('');
-  const [selectedProperty, setSelectedProperty] = useState('');
-  const [tenantUnit, setTenantUnit] = useState('');
-  const [effectiveDate, setEffectiveDate] = useState('');
-  const [primarySpace, setPrimarySpace] = useState('');
-  const [transferToSpace, setTransferToSpace] = useState('');
-  const [otherNotes, setOtherNotes] = useState('');
+  const [changeType, setChangeType] = useState<ChangeType | ''>(prefill?.changeType || '');
+  const [tenantName, setTenantName] = useState(prefill?.tenantName || '');
+  const [tenantCode, setTenantCode] = useState(prefill?.tenantCode || '');
+  const [selectedProperty, setSelectedProperty] = useState(prefill?.property || '');
+  const [tenantUnit, setTenantUnit] = useState(prefill?.unit || '');
+  const [effectiveDate, setEffectiveDate] = useState(prefill?.effectiveDate || '');
+  const [primarySpace, setPrimarySpace] = useState(prefill?.primarySpace || '');
+  const [transferToSpace, setTransferToSpace] = useState(prefill?.transferToSpace || '');
+  const [otherNotes, setOtherNotes] = useState(prefill?.notes || '');
 
   // Directory state for tenant autocomplete
   const [directory, setDirectory] = useState<{ tenantCode: string; residentName: string; unitNumber?: string; property?: string }[]>([]);
-  const [tenantSearch, setTenantSearch] = useState('');
+  const [tenantSearch, setTenantSearch] = useState(prefill?.tenantName || '');
   const [showTenantDropdown, setShowTenantDropdown] = useState(false);
   const [isLoadingDirectory, setIsLoadingDirectory] = useState(false);
   const tenantInputRef = useRef<HTMLInputElement>(null);
@@ -446,6 +469,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
         throw new Error(result.error || 'Failed to submit change');
       }
 
+      if (onSubmitted) await onSubmitted();
       alert('Parking change submitted successfully!');
       resetForm();
       setOpen(false);
@@ -463,15 +487,17 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
       setOpen(isOpen);
       if (!isOpen) resetForm();
     }}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Change Request
-        </Button>
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Change Request
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>New Parking Change Request</DialogTitle>
+          <DialogTitle>{prefill ? 'Assign Parking from Waitlist' : 'New Parking Change Request'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Change Type */}

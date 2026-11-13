@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Car, ArrowLeft, User, Key, Shield, LogOut, ParkingCircle, CheckCircle, AlertTriangle, History, Users, Search, Zap, Accessibility, RefreshCw, Download, FileText, Calendar, Undo2, BarChart3, TrendingUp, Target, Building2, Pencil, Layers } from 'lucide-react';
-import { ParkingChangeForm } from '@/components/parking-change-form';
+import { ParkingChangeForm, type ChangeFormPrefill } from '@/components/parking-change-form';
 import { ParkingReserveForm } from '@/components/parking-reserve-form';
 import { ParkingReservationMatches } from '@/components/parking-reservation-matches';
 import { ParkingWaitlistTable } from '@/components/parking-waitlist-table';
@@ -105,6 +105,7 @@ export default function ParkingPage() {
   const [spots, setSpots] = useState<ParkingSpot[]>([]);
   const [properties, setProperties] = useState<string[]>([]);
   const [waitlist, setWaitlist] = useState<ParkingWaitlist[]>([]);
+  const [waitlistAssign, setWaitlistAssign] = useState<{ entry: ParkingWaitlist; prefill: ChangeFormPrefill } | null>(null);
   const [activityLog, setActivityLog] = useState<ParkingChange[]>([]);
   const [loading, setLoading] = useState(true);
   const [userFullName, setUserFullName] = useState<string | null>(null);
@@ -1254,6 +1255,7 @@ export default function ParkingPage() {
                     <span className="ml-3 text-muted-foreground">Loading waitlist...</span>
                   </div>
                 ) : (
+                  <>
                   <ParkingWaitlistTable
                     entries={waitlist}
                     properties={properties}
@@ -1261,7 +1263,29 @@ export default function ParkingPage() {
                     currentUserEmail={user?.email}
                     spots={spots}
                     submitterName={userFullName || user?.email || 'Unknown'}
+                    onAssign={(entry, prefill) => setWaitlistAssign({ entry, prefill })}
                   />
+                  {waitlistAssign && (
+                    <ParkingChangeForm
+                      key={waitlistAssign.entry.id}
+                      hideTrigger
+                      open
+                      onOpenChange={(isOpen) => { if (!isOpen) setWaitlistAssign(null); }}
+                      prefill={waitlistAssign.prefill}
+                      onSubmitted={async () => {
+                        const { error } = await supabase
+                          .from('parking_waitlist')
+                          .update({ status: 'Assigned' })
+                          .eq('id', waitlistAssign.entry.id);
+                        if (error) alert(`The change was submitted, but ${waitlistAssign.entry.tenant_name} could not be removed from the waitlist: ${error.message}`);
+                      }}
+                      onSubmitSuccess={fetchData}
+                      submitterName={userFullName || 'Unknown'}
+                      properties={properties}
+                      spots={spots}
+                    />
+                  )}
+                  </>
                 )}
               </CardContent>
             </Card>

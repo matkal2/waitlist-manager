@@ -33,6 +33,7 @@ import { supabase } from '@/lib/supabase';
 import { Plus, Trash2, Pencil, Search, Download, X, User, Users, Car, Warehouse, ParkingCircle, ChevronDown, ChevronRight, Sparkles, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PROPERTY_UNITS } from '@/lib/property-units';
+import type { ChangeFormPrefill } from '@/components/parking-change-form';
 import { MatchableSpot, entryMatchesSpot, getSpotMatches, isSpotOpenForWaitlist, normalizePersonName } from '@/lib/parking-matching';
 
 interface ParkingWaitlistTableProps {
@@ -42,6 +43,7 @@ interface ParkingWaitlistTableProps {
   currentUserEmail?: string;
   spots?: MatchableSpot[];
   submitterName?: string;
+  onAssign?: (entry: ParkingWaitlist, prefill: ChangeFormPrefill) => void;
 }
 
 const WAITLIST_TYPES: { value: ParkingWaitlistType; label: string; priority: number }[] = [
@@ -57,6 +59,13 @@ const TYPE_DESCRIPTIONS: Record<string, string> = {
 };
 
 const STATUSES: ParkingWaitlistStatus[] = ['Active', 'Offered', 'Assigned', 'Cancelled'];
+
+const STATUS_HELP: Record<ParkingWaitlistStatus, string> = {
+  'Active': 'Waiting for a spot and shown as a match for open spots.',
+  'Offered': 'A spot has been offered; no longer matched to other spots.',
+  'Assigned': 'Has their spot; hidden from the waitlist.',
+  'Cancelled': 'No longer wants a spot; hidden from the waitlist.',
+};
 
 const STATUS_COLORS: Record<ParkingWaitlistStatus, string> = {
   'Active': 'bg-blue-500',
@@ -78,13 +87,9 @@ const formatDateLocal = (dateString: string) => {
   return date.toLocaleDateString();
 };
 
-export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUserEmail, spots = [], submitterName = 'Unknown' }: ParkingWaitlistTableProps) {
+export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUserEmail, spots = [], onAssign }: ParkingWaitlistTableProps) {
   const [notInDirectoryOnly, setNotInDirectoryOnly] = useState(false);
   const [directoryLoaded, setDirectoryLoaded] = useState(false);
-  const [assignTarget, setAssignTarget] = useState<{ entry: ParkingWaitlist; spot: MatchableSpot } | null>(null);
-  const [assignFromSpot, setAssignFromSpot] = useState('');
-  const [assignDate, setAssignDate] = useState('');
-  const [isAssigning, setIsAssigning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('Active');
@@ -165,63 +170,26 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
     return found ? found.full_space_code : value.trim();
   };
 
-  const openAssignDialog = (entry: ParkingWaitlist, spot: MatchableSpot) => {
+  const openAssign = (entry: ParkingWaitlist, spot?: MatchableSpot) => {
+    if (!onAssign) return;
+    const isUpgrade = entry.waitlist_type === 'Indoor Upgrade';
     const today = new Date().toISOString().split('T')[0];
-    const available = spot.status === 'Vacant' ? today : (spot.available_date || today).split('T')[0];
-    setAssignTarget({ entry, spot });
-    setAssignFromSpot(entry.waitlist_type === 'Indoor Upgrade' ? resolveSpotCode(entry, entry.current_spot_number) : '');
-    setAssignDate(available < today ? today : available);
-  };
-
-  const handleAssign = async () => {
-    if (!assignTarget) return;
-    const { entry, spot } = assignTarget;
-    const isTransfer = entry.waitlist_type === 'Indoor Upgrade';
-    if (isTransfer && !assignFromSpot.trim()) {
-      alert('Enter the spot they are moving from.');
-      return;
-    }
-    if (!assignDate) {
-      alert('Pick an effective date.');
-      return;
-    }
-    setIsAssigning(true);
-    try {
-      const tenant = directory.find(d => normalizePersonName(d.residentName) === normalizePersonName(entry.tenant_name));
-      const response = await fetch('/api/parking/change', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: isTransfer ? 'Transfer' : 'Add',
-          tenantName: entry.tenant_name,
-          tenantCode: tenant?.tenantCode || '',
-          tenantUnit: entry.unit_number,
-          property: entry.property,
-          effectiveDate: assignDate,
-          primarySpace: isTransfer ? assignFromSpot.trim() : spot.full_space_code,
-          transferToSpace: isTransfer ? spot.full_space_code : '',
-          submitter: submitterName,
-          otherNotes: `Assigned from parking waitlist (${entry.waitlist_type})`,
-          date: new Date().toLocaleDateString('en-US'),
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Failed to submit change');
-
-      const { error } = await supabase
-        .from('parking_waitlist')
-        .update({ status: 'Assigned' })
-        .eq('id', entry.id);
-      if (error) {
-        alert(`The ${isTransfer ? 'transfer' : 'add'} was submitted, but the waitlist entry could not be marked Assigned: ${error.message}`);
-      }
-      setAssignTarget(null);
-      onRefresh();
-    } catch (error) {
-      alert(`Failed to assign spot: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsAssigning(false);
-    }
+    const available = spot && spot.status !== 'Vacant' ? (spot.available_date || today).split('T')[0] : today;
+    const tenant = directory.find(d =>
+      normalizePersonName(d.residentName) === normalizePersonName(entry.tenant_name) &&
+      (!d.unitNumber || d.unitNumber === entry.unit_number)
+    ) || directory.find(d => normalizePersonName(d.residentName) === normalizePersonName(entry.tenant_name));
+    onAssign(entry, {
+      changeType: isUpgrade ? 'Transfer' : 'Add',
+      tenantName: entry.tenant_name,
+      tenantCode: tenant?.tenantCode || '',
+      property: entry.property,
+      unit: entry.unit_number,
+      primarySpace: isUpgrade ? resolveSpotCode(entry, entry.current_spot_number) : spot?.full_space_code || '',
+      transferToSpace: isUpgrade ? spot?.full_space_code || '' : '',
+      effectiveDate: spot ? (available > today ? available : today) : '',
+      notes: `Assigned from parking waitlist (${entry.waitlist_type})`,
+    });
   };
 
   // Close dropdown when clicking outside
@@ -649,7 +617,8 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
               <Fragment key={entry.id}>
                 <TableRow
                   className={`cursor-pointer ${selectedIds.has(entry.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
-                  onClick={() => setExpandedId(expanded ? null : entry.id)}
+                  onClick={() => (onAssign ? openAssign(entry) : setExpandedId(expanded ? null : entry.id))}
+                  title={onAssign ? 'Open a change request for this resident' : undefined}
                 >
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <Checkbox
@@ -660,7 +629,14 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                   <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      {expanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                      <button
+                        type="button"
+                        className="rounded p-0.5 hover:bg-muted"
+                        title={expanded ? 'Hide details' : 'Show details and matching spots'}
+                        onClick={(e) => { e.stopPropagation(); setExpandedId(expanded ? null : entry.id); }}
+                      >
+                        {expanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                      </button>
                       <div>
                         <div className="flex flex-wrap items-center gap-1.5 font-medium">
                           {entry.tenant_name}
@@ -759,7 +735,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                                     <span className={`text-xs ${rank === 1 ? 'font-medium text-green-700' : 'text-muted-foreground'}`}>
                                       {rank === 1 ? 'First in line' : `#${rank} in line`}
                                     </span>
-                                    <Button size="sm" className="ml-auto h-7" onClick={() => openAssignDialog(entry, spot)}>
+                                    <Button size="sm" className="ml-auto h-7" onClick={() => openAssign(entry, spot)}>
                                       <CheckCircle className="h-3.5 w-3.5 mr-1" />
                                       Assign
                                     </Button>
@@ -1072,25 +1048,27 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                   </SelectContent>
                 </Select>
               </div>
+              </div>
+
               {editingEntry && (
                 <div>
                   <Label>Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value as ParkingWaitlistStatus })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUSES.map(status => (
-                        <SelectItem key={status} value={status}>{status}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="mt-1 grid grid-cols-4 gap-1 rounded-lg border bg-muted/40 p-1">
+                    {STATUSES.map(status => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, status })}
+                        className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition ${formData.status === status ? 'bg-white text-foreground shadow-sm dark:bg-gray-900' : 'text-muted-foreground hover:text-foreground'}`}
+                      >
+                        <span className={`h-2 w-2 rounded-full ${STATUS_COLORS[status]}`} />
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{STATUS_HELP[formData.status as ParkingWaitlistStatus]}</p>
                 </div>
               )}
-              </div>
 
               {/* Notes */}
               <div>
@@ -1269,39 +1247,6 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
         </div>
       )}
 
-      {/* Assign matched spot */}
-      <Dialog open={!!assignTarget} onOpenChange={(open) => !open && setAssignTarget(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Assign {assignTarget?.spot.full_space_code}</DialogTitle>
-          </DialogHeader>
-          {assignTarget && (
-            <div className="space-y-4 py-2">
-              <p className="text-sm text-muted-foreground">
-                This submits {assignTarget.entry.waitlist_type === 'Indoor Upgrade' ? 'a Transfer' : 'an Add'} request to the parking sheet for{' '}
-                <span className="font-medium text-foreground">{assignTarget.entry.tenant_name}</span> ({assignTarget.entry.property}, Unit {assignTarget.entry.unit_number})
-                {' '}and marks their waitlist entry Assigned.
-              </p>
-              {assignTarget.entry.waitlist_type === 'Indoor Upgrade' && (
-                <div className="space-y-1">
-                  <Label htmlFor="assign-from">Moving from spot *</Label>
-                  <Input id="assign-from" value={assignFromSpot} onChange={(e) => setAssignFromSpot(e.target.value)} placeholder="e.g. Green Bay 440 12" />
-                </div>
-              )}
-              <div className="space-y-1">
-                <Label htmlFor="assign-date">Effective date *</Label>
-                <Input id="assign-date" type="date" value={assignDate} onChange={(e) => setAssignDate(e.target.value)} />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setAssignTarget(null)} disabled={isAssigning}>Cancel</Button>
-                <Button onClick={handleAssign} disabled={isAssigning}>
-                  {isAssigning ? 'Submitting...' : 'Assign spot'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
