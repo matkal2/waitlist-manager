@@ -20,7 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Car, ArrowLeft, User, Key, Shield, LogOut, ParkingCircle, CheckCircle, AlertTriangle, History, Users, Search, Zap, Accessibility, RefreshCw, Download, FileText, Calendar, Undo2, BarChart3, TrendingUp, Target, Building2, Pencil } from 'lucide-react';
+import { Car, ArrowLeft, User, Key, Shield, LogOut, ParkingCircle, CheckCircle, AlertTriangle, History, Users, Search, Zap, Accessibility, RefreshCw, Download, FileText, Calendar, Undo2, BarChart3, TrendingUp, Target, Building2, Pencil, Layers } from 'lucide-react';
 import { ParkingChangeForm } from '@/components/parking-change-form';
 import { ParkingReserveForm } from '@/components/parking-reserve-form';
 import { ParkingReservationMatches } from '@/components/parking-reservation-matches';
@@ -558,6 +558,27 @@ export default function ParkingPage() {
     return Math.round(totalDays / activeWaitlist.length);
   })();
 
+  // Residents holding more than one spot (current or future), across all lots
+  const spotsByTenant = new Map<string, string[]>();
+  for (const spot of spots) {
+    if (spot.tenant_code && !(spot.tenant_name || '').startsWith('(')) {
+      spotsByTenant.set(spot.tenant_code, [...(spotsByTenant.get(spot.tenant_code) || []), spot.full_space_code]);
+    }
+    if (spot.future_tenant_code && spot.future_tenant_code !== spot.tenant_code && !(spot.future_tenant_name || '').startsWith('(')) {
+      spotsByTenant.set(spot.future_tenant_code, [...(spotsByTenant.get(spot.future_tenant_code) || []), `${spot.full_space_code} (future)`]);
+    }
+  }
+  const multiSpotIcon = (code: string | null) => {
+    const held = code ? spotsByTenant.get(code) : undefined;
+    if (!held || held.length < 2) return null;
+    return (
+      <span title={`Holds ${held.length} spots: ${held.join(', ')}`} className="inline-flex cursor-help items-center gap-0.5 text-indigo-500">
+        <Layers className="h-3.5 w-3.5" />
+        <span className="text-[10px] font-semibold">{held.length}</span>
+      </span>
+    );
+  };
+
   // Apply filters to spots (property filter is required)
   const filteredSpots = spots.filter(spot => {
     if (!propertyFilter || spot.property !== propertyFilter) return false;
@@ -970,6 +991,7 @@ export default function ParkingPage() {
                                       <div>
                                         <div className="flex items-center gap-1">
                                           {spot.tenant_name && <span className="font-medium">{spot.tenant_name}</span>}
+                                          {multiSpotIcon(spot.tenant_code)}
                                           {spot.status === 'Notice' && (
                                             <Badge variant="outline" className="text-[10px] px-1 py-0 bg-orange-50 text-orange-600 border-orange-300">
                                               Leaving
@@ -1104,8 +1126,9 @@ export default function ParkingPage() {
                                       <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-700 border-blue-300 cursor-pointer">
                                         📅 Future
                                       </Badge>
+                                      <span className="ml-1 align-middle">{multiSpotIcon(spot.future_tenant_code)}</span>
                                       <div className="absolute z-50 bottom-full left-0 mb-2 hidden group-hover:block w-48 p-2 bg-white border border-blue-200 rounded-lg shadow-lg text-xs">
-                                        <div className="font-semibold text-blue-800">{spot.future_tenant_name || 'Tenant Assigned'}</div>
+                                        <div className="flex items-center gap-1 font-semibold text-blue-800">{spot.future_tenant_name || 'Tenant Assigned'}{multiSpotIcon(spot.future_tenant_code)}</div>
                                         {spot.future_unit_number && <div className="text-gray-600">Unit: {spot.future_unit_number}</div>}
                                         <div className="text-blue-600">
                                           Starts: {spot.future_start_date ? new Date(spot.future_start_date + 'T00:00:00').toLocaleDateString() : 'TBD'}
