@@ -607,7 +607,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
             <TableHead>Type</TableHead>
             <TableHead className="hidden sm:table-cell">Status</TableHead>
             <TableHead className="hidden md:table-cell">Waiting</TableHead>
-            <TableHead className="w-[90px] text-right">Actions</TableHead>
+            <TableHead className="w-[170px] text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -617,8 +617,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
               <Fragment key={entry.id}>
                 <TableRow
                   className={`cursor-pointer ${selectedIds.has(entry.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
-                  onClick={() => (onAssign ? openAssign(entry) : setExpandedId(expanded ? null : entry.id))}
-                  title={onAssign ? 'Open a change request for this resident' : undefined}
+                  onClick={() => setExpandedId(expanded ? null : entry.id)}
                 >
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <Checkbox
@@ -629,14 +628,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                   <TableCell className="font-medium text-muted-foreground">{index + 1}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="rounded p-0.5 hover:bg-muted"
-                        title={expanded ? 'Hide details' : 'Show details and matching spots'}
-                        onClick={(e) => { e.stopPropagation(); setExpandedId(expanded ? null : entry.id); }}
-                      >
-                        {expanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                      </button>
+                      {expanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                       <div>
                         <div className="flex flex-wrap items-center gap-1.5 font-medium">
                           {entry.tenant_name}
@@ -670,7 +662,13 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                     {daysWaiting(entry.created_at)} days
                   </TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex justify-end gap-1">
+                    <div className="flex items-center justify-end gap-1">
+                      {onAssign && (entry.status === 'Active' || entry.status === 'Offered') && (
+                        <Button size="sm" className="h-7" onClick={() => openAssign(entry)} title="Open a pre-filled change request">
+                          <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                          Assign
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" onClick={() => openEditDialog(entry)} title="Edit">
                         <Pencil className="h-4 w-4" />
                       </Button>
