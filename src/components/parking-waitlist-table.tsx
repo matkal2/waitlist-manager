@@ -960,7 +960,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
               </div>
 
               {/* Property & Unit - Auto-populated */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <Label>Property *</Label>
                   <Input
@@ -1031,7 +1031,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
                 <Label>Preferred Spot Type</Label>
                 <Select
@@ -1053,7 +1053,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
               {editingEntry && (
                 <div>
                   <Label>Status</Label>
-                  <div className="mt-1 grid grid-cols-4 gap-1 rounded-lg border bg-muted/40 p-1">
+                  <div className="mt-1 grid grid-cols-2 gap-1 rounded-lg border bg-muted/40 p-1 sm:grid-cols-4">
                     {STATUSES.map(status => (
                       <button
                         key={status}
@@ -1097,7 +1097,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
 
       {/* Bulk Actions Bar - shown when items selected */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200">
+        <div className="flex flex-wrap items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200">
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <div className="flex gap-2">
             <Select onValueChange={(value) => handleBulkStatusChange(value as ParkingWaitlistStatus)}>

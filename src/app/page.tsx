@@ -89,25 +89,25 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img src="/highpoint-logo.png" alt="Highpoint Living" className="h-10 w-auto" />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+        <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <img src="/highpoint-logo.png" alt="Highpoint Living" className="hidden h-10 w-auto sm:block" />
+              <div className="min-w-0">
+                <h1 className="truncate text-lg font-bold text-gray-900 dark:text-white sm:text-2xl">
                   Property Management Hub
                 </h1>
-                <p className="text-sm text-muted-foreground">
+                <p className="hidden text-sm text-muted-foreground sm:block">
                   Select a module to get started
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm">
-                    <User className="h-4 w-4 mr-2" />
-                    {userFullName || 'Account'}
+                    <User className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">{userFullName || 'Account'}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">

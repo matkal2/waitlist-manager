@@ -152,8 +152,8 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Entry
+          <Plus className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Add Entry</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -195,7 +195,7 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="full_name">Full Name *</Label>
               <Input 
@@ -214,7 +214,7 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="phone">Phone</Label>
               <Input id="phone" {...register('phone')} placeholder="(555) 123-4567" />
@@ -244,7 +244,7 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="property">Property *</Label>
               <Select onValueChange={(value) => {
@@ -313,7 +313,7 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
 
           {/* Unit Numbers - only show if property is selected */}
           {watch('property') && PROPERTY_UNITS[watch('property')] && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <Label>Unit Numbers <span className="text-xs text-muted-foreground">(optional)</span></Label>
                 <Select
@@ -369,7 +369,7 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="floor_pref">Floor Preference</Label>
               <Select
@@ -389,7 +389,7 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label htmlFor="max_budget">Max Budget ($)</Label>
               <Input
@@ -403,7 +403,7 @@ export function AddEntryForm({ onEntryAdded }: AddEntryFormProps) {
 
           <div className="space-y-2">
             {useDateRange ? (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="move_in_date">Move-in Start Date *</Label>
                   <Input 

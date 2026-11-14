@@ -830,7 +830,7 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail, units = []
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="edit-name">Full Name *</Label>
                 <Input
@@ -942,7 +942,7 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail, units = []
               </div>
               {/* Unit Numbers - only show if property has units defined */}
               {editForm.property && PROPERTY_UNITS[editForm.property] && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Unit Numbers <span className="text-xs text-muted-foreground">(optional)</span></Label>
                     <Select
@@ -1054,7 +1054,7 @@ export function WaitlistTable({ entries, onRefresh, currentUserEmail, units = []
 
             {/* Move-in Date Section */}
             <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="edit-move-in">Move-in Date {editForm.move_in_date_end ? '(Start)' : ''} *</Label>
                   <Input

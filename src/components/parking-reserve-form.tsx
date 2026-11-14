@@ -185,7 +185,7 @@ export function ParkingReserveForm({ spot, spots = [], open, onOpenChange, onSuc
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5 text-amber-600" />
@@ -231,7 +231,7 @@ export function ParkingReserveForm({ spot, spots = [], open, onOpenChange, onSuc
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="applicant_name" className="flex items-center gap-1">
                 <User className="h-3 w-3" />

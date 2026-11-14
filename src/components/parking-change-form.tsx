@@ -496,8 +496,8 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
       {!hideTrigger && (
         <DialogTrigger asChild>
           <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Change Request
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add Change Request</span>
           </Button>
         </DialogTrigger>
       )}
@@ -701,7 +701,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Property - Auto-populated from tenant selection */}
             <div>
               <Label>Property *</Label>
@@ -733,7 +733,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {/* Effective Date */}
             <div>
               <Label htmlFor="effectiveDate">Effective Date *</Label>
@@ -1046,7 +1046,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
           </div>
 
           {/* Submitter (auto-filled, read-only) */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Label>Submitter</Label>
               <Input
