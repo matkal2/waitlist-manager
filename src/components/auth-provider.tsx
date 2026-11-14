@@ -51,11 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user?.email) {
-        fetchUserRole(session.user.email);
+        await fetchUserRole(session.user.email);
       }
       setLoading(false);
     });

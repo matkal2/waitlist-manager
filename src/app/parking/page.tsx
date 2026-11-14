@@ -642,7 +642,7 @@ export default function ParkingPage() {
                     <Key className="h-4 w-4 mr-2" />
                     Change Password
                   </DropdownMenuItem>
-                  {(user?.email === ADMIN_EMAIL || user?.email === 'matthew.kaleb1763@gmail.com') && (
+                  {(permissions.canAccessAdmin(userRole) || user?.email === ADMIN_EMAIL || user?.email === 'matthew.kaleb1763@gmail.com') && (
                     <DropdownMenuItem onClick={() => router.push('/admin')}>
                       <Shield className="h-4 w-4 mr-2" />
                       Admin Panel

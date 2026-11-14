@@ -40,7 +40,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Shield, UserPlus, Users, Mail, Trash2, ArrowLeft, User, Key, LogOut } from 'lucide-react';
-import { UserRole, ROLE_LABELS } from '@/lib/permissions';
+import { UserRole, ROLE_LABELS, permissions } from '@/lib/permissions';
 
 // Admin email - only this user can access admin features
 const ADMIN_EMAIL = 'mkaleb@hpvgproperties.com';
@@ -70,7 +70,7 @@ interface PendingInvite {
 }
 
 export default function AdminPage() {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, userRole } = useAuth();
   const router = useRouter();
   
   const handleSignOut = async () => {
@@ -85,7 +85,10 @@ export default function AdminPage() {
   const [sending, setSending] = useState(false);
 
   // Check if current user is admin
-  const isAdmin = user?.email === ADMIN_EMAIL || user?.email === 'matthew.kaleb1763@gmail.com';
+  const isAdmin =
+    permissions.canManageUsers(userRole) ||
+    user?.email === ADMIN_EMAIL ||
+    user?.email === 'matthew.kaleb1763@gmail.com';
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -489,6 +492,12 @@ export default function AdminPage() {
                             </SelectItem>
                             <SelectItem value="property_manager">
                               <Badge className="bg-green-100 text-green-800">Property Manager</Badge>
+                            </SelectItem>
+                            <SelectItem value="accounting">
+                              <Badge className="bg-amber-100 text-amber-800">Accounting</Badge>
+                            </SelectItem>
+                            <SelectItem value="maintenance">
+                              <Badge className="bg-slate-200 text-slate-800">Maintenance</Badge>
                             </SelectItem>
                           </SelectContent>
                         </Select>
