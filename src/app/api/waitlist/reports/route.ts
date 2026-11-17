@@ -1,3 +1,5 @@
+import { authorize } from '@/lib/api-auth';
+import { permissions } from '@/lib/permissions';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { normalizeReportProperty, toReportRecord, type ReportRecord } from '@/lib/waitlist-report-history';
@@ -8,7 +10,10 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Returns report records for current, archived, and permanently deleted entries; the client aggregates by period/property
-export async function GET() {
+export async function GET(request: Request) {
+  const caller = await authorize(request, permissions.canAccessWaitlist);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     const { data: entries, error } = await supabase.from('waitlist_entries').select('*');
     if (error) {

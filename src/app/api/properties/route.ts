@@ -1,3 +1,4 @@
+import { authorize } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 
 const SHEET_ID = '1w78XH8yuyuoZm_l1PtHIFzXygwEjS56lV0rZwEQvNwM';
@@ -66,7 +67,10 @@ async function fetchPropertiesFromSheet(): Promise<Property[]> {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const caller = await authorize(request);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     const properties = await fetchPropertiesFromSheet();
     

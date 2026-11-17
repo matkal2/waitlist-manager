@@ -1,6 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+// Public: the register page looks up its invite here (the invites table is not readable from the browser)
+export async function GET(request: NextRequest) {
+  const inviteId = request.nextUrl.searchParams.get('invite');
+  if (!inviteId) return NextResponse.json({ error: 'Invalid invite link.' }, { status: 400 });
+
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+  const { data: invite } = await supabaseAdmin
+    .from('user_invites')
+    .select('email, full_name, used, expires_at')
+    .eq('id', inviteId)
+    .maybeSingle();
+
+  if (!invite) return NextResponse.json({ error: 'invalid' }, { status: 404 });
+  if (invite.used) return NextResponse.json({ error: 'used' }, { status: 410 });
+  if (new Date(invite.expires_at) < new Date()) return NextResponse.json({ error: 'expired' }, { status: 410 });
+  return NextResponse.json({ email: invite.email, full_name: invite.full_name });
+}
+
 export async function POST(request: NextRequest) {
   console.log('=== REGISTRATION API CALLED ===');
   
@@ -50,6 +72,10 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Invite found:', { used: invite.used, expires_at: invite.expires_at });
+
+    if (String(invite.email).toLowerCase() !== String(email).toLowerCase()) {
+      return NextResponse.json({ error: 'This invite was sent to a different email address' }, { status: 400 });
+    }
 
     if (invite.used) {
       return NextResponse.json({ error: 'This invite has already been used' }, { status: 400 });

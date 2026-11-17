@@ -1,3 +1,4 @@
+import { systemAuthHeaders } from '@/lib/api-auth';
 import { createClient } from '@supabase/supabase-js';
 
 interface MovedOutSpot {
@@ -22,7 +23,7 @@ export async function runParkingAutoMoveOuts(baseUrl: string) {
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  const res = await fetch(`${baseUrl}/api/parking`, { cache: 'no-store' });
+  const res = await fetch(`${baseUrl}/api/parking`, { cache: 'no-store', headers: systemAuthHeaders() });
   if (!res.ok) throw new Error(`Parking inventory request failed (${res.status})`);
   const data = await res.json();
   const candidates: MovedOutSpot[] = (data.spots || []).filter(
@@ -55,7 +56,7 @@ export async function runParkingAutoMoveOuts(baseUrl: string) {
     const moveOut = new Date(`${spot.move_out_date}T00:00:00`).toLocaleDateString('en-US');
     const response = await fetch(`${baseUrl}/api/parking/change`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...systemAuthHeaders() },
       body: JSON.stringify({
         type: 'Termination',
         tenantName: spot.moved_out_tenant_name,

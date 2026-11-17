@@ -1,3 +1,5 @@
+import { authorize } from '@/lib/api-auth';
+import { permissions } from '@/lib/permissions';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -24,6 +26,9 @@ interface ParkingChangeRequest {
 }
 
 export async function POST(request: Request) {
+  const caller = await authorize(request, permissions.canSubmitChangeRequest);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     const body: ParkingChangeRequest = await request.json();
 
@@ -154,7 +159,10 @@ export async function POST(request: Request) {
 }
 
 // GET endpoint to retrieve pending changes
-export async function GET() {
+export async function GET(request: Request) {
+  const caller = await authorize(request);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     const { data, error } = await supabase
       .from('parking_changes')

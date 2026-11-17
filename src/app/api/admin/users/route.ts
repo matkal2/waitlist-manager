@@ -1,3 +1,5 @@
+import { authorize } from '@/lib/api-auth';
+import { permissions } from '@/lib/permissions';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -7,7 +9,10 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-export async function GET() {
+export async function GET(request: Request) {
+  const caller = await authorize(request, permissions.canManageUsers);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     // Try to get users from user_profiles first
     const { data: profiles, error: profileError } = await supabaseAdmin
@@ -61,6 +66,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const caller = await authorize(request, permissions.canManageUsers);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     const { userId, role } = await request.json();
     
@@ -79,6 +87,9 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const caller = await authorize(request, permissions.canManageUsers);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     const { userId } = await request.json();
     
