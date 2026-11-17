@@ -17,6 +17,7 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [validSession, setValidSession] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [samePassword, setSamePassword] = useState(false);
 
   useEffect(() => {
     // Check if user has a valid session from the reset link
@@ -57,14 +58,18 @@ export default function ResetPasswordPage() {
     }
 
     setError('');
+    setSamePassword(false);
     setLoading(true);
 
     const { error } = await supabase.auth.updateUser({
       password: password,
     });
 
-    if (error) {
-      setError('Failed to update password. Please try again.');
+    if (error?.code === 'same_password') {
+      setSamePassword(true);
+      setLoading(false);
+    } else if (error) {
+      setError(error.message || 'Failed to update password. Please try again.');
       setLoading(false);
     } else {
       alert('Password updated successfully!');
@@ -97,6 +102,35 @@ export default function ResetPasswordPage() {
           <CardContent>
             <Button onClick={() => router.push('/login')} className="w-full">
               Back to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const goToLogin = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
+
+  if (samePassword) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <img src="/highpoint-logo.png" alt="Highpoint Living" className="h-14 w-auto mx-auto mb-2" />
+            <CardTitle>That&apos;s Already Your Password</CardTitle>
+            <CardDescription>
+              The password you entered is the one you already have, so there&apos;s nothing to change. Go ahead and sign in with it.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Button onClick={goToLogin} className="w-full">
+              Go to Sign In
+            </Button>
+            <Button variant="ghost" className="w-full" onClick={() => { setSamePassword(false); setPassword(''); setConfirmPassword(''); }}>
+              Choose a different password
             </Button>
           </CardContent>
         </Card>
