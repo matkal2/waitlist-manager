@@ -21,13 +21,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Car, ArrowLeft, User, Key, Shield, LogOut, ParkingCircle, CheckCircle, AlertTriangle, History, Users, Search, Zap, Accessibility, RefreshCw, Download, FileText, Calendar, Undo2, BarChart3, TrendingUp, Target, Building2, Pencil, Layers } from 'lucide-react';
+import { Car, ArrowLeft, User, Key, Shield, LogOut, ParkingCircle, CheckCircle, AlertTriangle, History, Users, Search, Zap, Accessibility, RefreshCw, Download, FileText, FileSpreadsheet, Calendar, Undo2, BarChart3, TrendingUp, Target, Building2, Pencil, Layers } from 'lucide-react';
 import { ParkingChangeForm, type ChangeFormPrefill } from '@/components/parking-change-form';
 import { ParkingReserveForm } from '@/components/parking-reserve-form';
 import { ParkingReservationMatches } from '@/components/parking-reservation-matches';
 import { ParkingWaitlistTable } from '@/components/parking-waitlist-table';
 import { getSpotMatches, normalizeParkingProperty } from '@/lib/parking-matching';
 import { exportParkingToPDF } from '@/lib/pdf-export';
+import { exportParkingToExcel } from '@/lib/excel-export';
 import { permissions } from '@/lib/permissions';
 
 interface ParkingSpot {
@@ -537,6 +538,12 @@ export default function ParkingPage() {
   };
 
   // Demand by property - properties with highest waitlist demand
+  const trackingWaitlistCounts = () =>
+    waitlist.reduce<Record<string, number>>((counts, w) => {
+      if (w.status === 'Active') counts[w.property] = (counts[w.property] || 0) + 1;
+      return counts;
+    }, {});
+
   const demandByProperty = properties.map(p => {
     const propWaitlist = waitlist.filter(w => w.property === p && w.status === 'Active');
     const propSpots = spots.filter(s => s.property === p);
@@ -1792,6 +1799,43 @@ export default function ParkingPage() {
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" disabled={loading || spots.length === 0}>
+                          <Download className="h-4 w-4 sm:mr-1" />
+                          <span className="hidden sm:inline">Export</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-64">
+                        <DropdownMenuLabel className="text-xs text-muted-foreground">
+                          {trackingProperty === 'all' ? 'Select a property tile to export it' : trackingProperty}
+                        </DropdownMenuLabel>
+                        <DropdownMenuItem
+                          disabled={trackingProperty === 'all'}
+                          onClick={() => exportParkingToPDF(spots, trackingProperty, false, trackingWaitlistCounts())}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          This property (PDF)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={trackingProperty === 'all'}
+                          onClick={() => exportParkingToExcel(spots, trackingProperty, trackingWaitlistCounts())}
+                        >
+                          <FileSpreadsheet className="h-4 w-4 mr-2" />
+                          This property (Excel)
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-xs text-muted-foreground">Full portfolio</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => exportParkingToPDF(spots, null, true, trackingWaitlistCounts())}>
+                          <FileText className="h-4 w-4 mr-2" />
+                          Full portfolio (PDF)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => exportParkingToExcel(spots, null, trackingWaitlistCounts())}>
+                          <FileSpreadsheet className="h-4 w-4 mr-2" />
+                          Full portfolio (Excel)
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <Button variant="outline" size="sm" onClick={() => fetchData(false)} disabled={loading}>
                       <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>

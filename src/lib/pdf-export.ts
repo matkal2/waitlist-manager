@@ -1,26 +1,15 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-interface ParkingSpot {
-  property: string;
-  spot_number: string;
-  full_space_code: string;
-  spot_type: string;
-  status: string;
-  tenant_code: string | null;
-  tenant_name: string | null;
-  unit_number: string | null;
-  monthly_rent: number;
-  available_date: string | null;
-  termination_date: string | null;
-  has_ev_charging: boolean;
-  is_handicap: boolean;
-}
+import {
+  groupByProperty, portfolioSummary, reportFileName, summarize, type ReportSpot as ParkingSpot,
+} from '@/lib/parking-report';
 
 export function exportParkingToPDF(
   spots: ParkingSpot[],
   propertyName: string | null,
-  allProperties: boolean = false
+  allProperties: boolean = false,
+  waitlistByProperty: Record<string, number> = {}
 ) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -35,14 +24,7 @@ export function exportParkingToPDF(
     white: [255, 255, 255] as [number, number, number],
   };
   
-  // Group spots by property
-  const spotsByProperty: Record<string, ParkingSpot[]> = {};
-  spots.forEach(spot => {
-    if (!spotsByProperty[spot.property]) {
-      spotsByProperty[spot.property] = [];
-    }
-    spotsByProperty[spot.property].push(spot);
-  });
+  const spotsByProperty = groupByProperty(spots);
 
   const propertiesToExport = allProperties 
     ? Object.keys(spotsByProperty).sort()
@@ -51,8 +33,52 @@ export function exportParkingToPDF(
       : [];
 
   let isFirstPage = true;
+  const dateLabel = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  propertiesToExport.forEach((property, propIndex) => {
+  if (allProperties) {
+    const rows = propertiesToExport.map(p => summarize(p, spotsByProperty[p] || [], waitlistByProperty[p] || 0));
+    const total = portfolioSummary(rows);
+    doc.setDrawColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+    doc.setLineWidth(0.5);
+    doc.line(14, 12, pageWidth - 14, 12);
+    doc.setTextColor(colors.primary[0], colors.primary[1], colors.primary[2]);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PARKING INVENTORY', 14, 22);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Full Portfolio Summary', 14, 30);
+    doc.setFontSize(9);
+    doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+    doc.text(dateLabel, pageWidth - 14, 22, { align: 'right' });
+    doc.setDrawColor(colors.border[0], colors.border[1], colors.border[2]);
+    doc.setLineWidth(0.3);
+    doc.line(14, 35, pageWidth - 14, 35);
+
+    const toRow = (r: ReturnType<typeof summarize>) => [
+      r.property, r.total, r.indoor, r.outdoor, r.occupied, r.vacant, r.notice, r.reservedOrFuture, `${r.occupancyRate}%`, r.waitlist,
+    ];
+    autoTable(doc, {
+      startY: 45,
+      head: [['Property', 'Spots', 'Indoor', 'Outdoor', 'Occupied', 'Vacant', 'Notice', 'Res./Future', 'Occupancy', 'Waitlist']],
+      body: rows.map(toRow),
+      foot: [toRow(total)],
+      theme: 'plain',
+      headStyles: { fontStyle: 'bold', fontSize: 8, textColor: colors.primary, cellPadding: 3 },
+      bodyStyles: { fontSize: 8, textColor: colors.primary, cellPadding: 3 },
+      footStyles: { fontStyle: 'bold', fontSize: 8, textColor: colors.primary, fillColor: colors.light, cellPadding: 3 },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      styles: { lineColor: colors.border, lineWidth: 0.2, halign: 'center' },
+      columnStyles: { 0: { halign: 'left', cellWidth: 42 } },
+      margin: { left: 14, right: 14 },
+    });
+    doc.setFontSize(8);
+    doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+    doc.text('Occupancy = (Occupied + Notice) / (Occupied + Vacant + Notice). Reserved and Future spots are not counted.', 14, pageHeight - 24);
+    isFirstPage = false;
+  }
+
+  propertiesToExport.forEach((property) => {
     const propertySpots = spotsByProperty[property] || [];
     
     if (!isFirstPage) {
@@ -81,11 +107,7 @@ export function exportParkingToPDF(
     // Date - right aligned
     doc.setFontSize(9);
     doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
-    doc.text(new Date().toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    }), pageWidth - 14, 22, { align: 'right' });
+    doc.text(dateLabel, pageWidth - 14, 22, { align: 'right' });
 
     // Underline
     doc.setDrawColor(colors.border[0], colors.border[1], colors.border[2]);
@@ -100,9 +122,7 @@ export function exportParkingToPDF(
     const notice = propertySpots.filter(s => s.status === 'Notice').length;
     const indoor = propertySpots.filter(s => s.spot_type === 'Indoor').length;
     const outdoor = propertySpots.filter(s => s.spot_type === 'Outdoor').length;
-    const occupancyRate = propertySpots.length > 0 
-      ? Math.round((occupied / propertySpots.length) * 100) 
-      : 0;
+    const occupancyRate = summarize(property, propertySpots).occupancyRate;
 
     // Summary section with subtle background
     doc.setFillColor(colors.light[0], colors.light[1], colors.light[2]);
@@ -194,27 +214,20 @@ export function exportParkingToPDF(
       },
     });
 
-    // Footer
-    doc.setFontSize(8);
-    doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
-    doc.setFont('helvetica', 'normal');
-    doc.text(
-      `Page ${propIndex + 1} of ${propertiesToExport.length}`,
-      pageWidth / 2,
-      pageHeight - 12,
-      { align: 'center' }
-    );
-    
-    // Bottom line
+  });
+
+  // Footer on every page (property tables can run onto several pages)
+  const pageCount = doc.getNumberOfPages();
+  for (let page = 1; page <= pageCount; page++) {
+    doc.setPage(page);
     doc.setDrawColor(colors.border[0], colors.border[1], colors.border[2]);
     doc.setLineWidth(0.3);
     doc.line(14, pageHeight - 18, pageWidth - 14, pageHeight - 18);
-  });
+    doc.setFontSize(8);
+    doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Page ${page} of ${pageCount}`, pageWidth / 2, pageHeight - 12, { align: 'center' });
+  }
 
-  // Download
-  const filename = allProperties 
-    ? `parking-inventory-all-${new Date().toISOString().split('T')[0]}.pdf`
-    : `parking-inventory-${propertyName?.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
-  
-  doc.save(filename);
+  doc.save(reportFileName(allProperties ? null : propertyName, 'pdf'));
 }
