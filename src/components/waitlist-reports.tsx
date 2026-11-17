@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/lib/api-fetch';
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -70,7 +71,7 @@ export function WaitlistReports() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/waitlist/reports');
+      const response = await apiFetch('/api/waitlist/reports');
       if (!response.ok) throw new Error('Failed to fetch reports');
       setData(await response.json());
     } catch (err) {

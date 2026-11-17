@@ -1,3 +1,4 @@
+import { authorize } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { ParkingReservation } from '@/types/database';
@@ -479,7 +480,10 @@ const readUnitCell = (cell: { v?: unknown; f?: string } | null | undefined): str
   return cell?.v?.toString() || formatted;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
+  const caller = await authorize(request);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     // Fetch directory first for tenant name lookups
     const directoryMap = await fetchDirectory();

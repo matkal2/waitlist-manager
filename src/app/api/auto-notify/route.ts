@@ -1,3 +1,5 @@
+import { authorize } from '@/lib/api-auth';
+import { permissions } from '@/lib/permissions';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import type { WaitlistEntry } from '@/types/database';
@@ -113,7 +115,10 @@ async function getNotifiedPairs(): Promise<Set<string>> {
   return pairs;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const caller = await authorize(request, permissions.canAccessWaitlist);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     const [units, entries, notifiedPairs, directory] = await Promise.all([
       fetchSheetUnits(),

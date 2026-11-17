@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/lib/api-fetch';
 
 import { useState, useEffect } from 'react';
 import { CLOSED_OUTCOMES, normalizePropertyName } from '@/lib/waitlist-matching';
@@ -222,7 +223,7 @@ export function SheetsMatchAlerts({ units, waitlistEntries, onMatchCountChange, 
     
     try {
       // The server emails each assigned agent; unassigned entries go to the leasing inbox
-      const response = await fetch('/api/notify', {
+      const response = await apiFetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

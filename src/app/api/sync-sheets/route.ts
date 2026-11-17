@@ -1,3 +1,5 @@
+import { authorize } from '@/lib/api-auth';
+import { permissions } from '@/lib/permissions';
 import { NextResponse } from 'next/server';
 
 const SPREADSHEET_ID = '1OTm2nalt3DUBPzM_kQ4ZmiO0cs0dLUC2o72DYgoRA0U';
@@ -108,7 +110,10 @@ function extractUnitNumber(addressAndApt: string): string {
   return match ? match[1] : '';
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const caller = await authorize(request, permissions.canAccessWaitlist);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     // Specify the DASH sheet explicitly
     const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=DASH`;

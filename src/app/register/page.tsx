@@ -33,24 +33,21 @@ function RegisterForm() {
 
   const validateInvite = async () => {
     try {
-      const { data, error } = await supabase
-        .from('user_invites')
-        .select('*')
-        .eq('id', inviteId)
-        .single();
+      const response = await fetch(`/api/register?invite=${encodeURIComponent(inviteId!)}`);
+      const data = await response.json();
 
-      if (error || !data) {
-        setError('Invalid invite link. Please request a new invite from your administrator.');
-        return;
-      }
-
-      if (data.used) {
+      if (data.error === 'used') {
         setError('This invite has already been used. Please request a new invite.');
         return;
       }
 
-      if (new Date(data.expires_at) < new Date()) {
+      if (data.error === 'expired') {
         setError('This invite has expired. Please request a new invite from your administrator.');
+        return;
+      }
+
+      if (!response.ok || !data.email) {
+        setError('Invalid invite link. Please request a new invite from your administrator.');
         return;
       }
 

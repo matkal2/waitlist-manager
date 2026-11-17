@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/lib/api-fetch';
 
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
@@ -114,7 +115,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
   useEffect(() => {
     if (open && directory.length === 0) {
       setIsLoadingDirectory(true);
-      fetch('/api/directory')
+      apiFetch('/api/directory')
         .then(res => res.json())
         .then(data => {
           setDirectory(data.directory || []);
@@ -451,7 +452,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/parking/change', {
+      const response = await apiFetch('/api/parking/change', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

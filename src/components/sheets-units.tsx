@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/lib/api-fetch';
 
 import { useState, useEffect, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -99,7 +100,7 @@ export function SheetsUnits({ onUnitsLoaded }: SheetsUnitsProps) {
     }
     
     try {
-      const response = await fetch('/api/sync-sheets');
+      const response = await apiFetch('/api/sync-sheets');
       const data = await response.json();
       
       if (data.success) {
@@ -112,7 +113,7 @@ export function SheetsUnits({ onUnitsLoaded }: SheetsUnitsProps) {
         
         // Auto-check for matches and send notifications
         try {
-          const notifyResponse = await fetch('/api/auto-notify');
+          const notifyResponse = await apiFetch('/api/auto-notify');
           const notifyData = await notifyResponse.json();
           if (notifyData.notificationsSent > 0) {
             console.log(`Auto-notifications sent: ${notifyData.notificationsSent}`);

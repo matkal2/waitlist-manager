@@ -1,3 +1,5 @@
+import { authorize } from '@/lib/api-auth';
+import { permissions } from '@/lib/permissions';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { ParkingReservation } from '@/types/database';
@@ -9,6 +11,9 @@ const supabase = createClient(
 
 // GET - Fetch all reservations (optionally filtered by status or property)
 export async function GET(request: Request) {
+  const caller = await authorize(request);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
@@ -43,6 +48,9 @@ export async function GET(request: Request) {
 
 // POST - Create a new reservation
 export async function POST(request: Request) {
+  const caller = await authorize(request, permissions.canReserveSpot);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     const body = await request.json();
     
@@ -136,6 +144,9 @@ export async function POST(request: Request) {
 
 // PATCH - Update a reservation (cancel, convert, etc.)
 export async function PATCH(request: Request) {
+  const caller = await authorize(request, permissions.canReserveSpot);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     const body = await request.json();
     const { id, ...updates } = body;
@@ -170,6 +181,9 @@ export async function PATCH(request: Request) {
 
 // DELETE - Delete a reservation (soft delete by setting status to cancelled)
 export async function DELETE(request: Request) {
+  const caller = await authorize(request, permissions.canCancelReservation);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

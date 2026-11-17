@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-fetch';
 // src/lib/properties.ts
 
 export interface Property {
@@ -60,7 +61,7 @@ export const getPropertyByNickname = (nickname: string) =>
 // Dynamic fetch function for client-side use
 export async function fetchProperties(): Promise<Property[]> {
   try {
-    const response = await fetch('/api/properties');
+    const response = await apiFetch('/api/properties');
     const data = await response.json();
     if (data.success) {
       return data.properties;

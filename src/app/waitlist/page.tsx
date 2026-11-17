@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/lib/api-fetch';
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -100,7 +101,7 @@ export default function WaitlistPage() {
   // Load available units up front so the Dashboard can show unit matches
   useEffect(() => {
     if (!user) return;
-    fetch('/api/sync-sheets')
+    apiFetch('/api/sync-sheets')
       .then(res => res.json())
       .then(data => { if (data.success) setSheetUnits(data.units); })
       .catch(err => console.error('Error loading available units:', err));
@@ -140,7 +141,7 @@ export default function WaitlistPage() {
           }
           
           // Trigger auto-notify in background
-          await fetch('/api/auto-notify');
+          await apiFetch('/api/auto-notify');
           localStorage.setItem(lastCheckKey, now.toISOString());
         } catch (error) {
           console.error('Background match alert check failed:', error);

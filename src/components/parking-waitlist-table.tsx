@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/lib/api-fetch';
 
 import { Fragment, useState, useEffect, useRef } from 'react';
 import { ParkingWaitlist, ParkingWaitlistType, ParkingWaitlistStatus } from '@/types/database';
@@ -133,7 +134,7 @@ export function ParkingWaitlistTable({ entries, properties, onRefresh, currentUs
   // Directory feeds tenant autocomplete and the "Not in Directory" check
   useEffect(() => {
     setIsLoadingDirectory(true);
-    fetch('/api/directory')
+    apiFetch('/api/directory')
       .then(res => res.json())
       .then(data => {
         const list = data.directory || [];

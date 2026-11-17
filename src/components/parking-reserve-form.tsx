@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/lib/api-fetch';
 
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -87,7 +88,7 @@ export function ParkingReserveForm({ spot, spots = [], open, onOpenChange, onSuc
   const [directory, setDirectory] = useState<DirectoryEntry[]>([]);
   useEffect(() => {
     if (open && directory.length === 0) {
-      fetch('/api/directory')
+      apiFetch('/api/directory')
         .then(res => res.json())
         .then(data => setDirectory(data.directory || []))
         .catch(err => console.error('Failed to load directory:', err));
@@ -130,7 +131,7 @@ export function ParkingReserveForm({ spot, spots = [], open, onOpenChange, onSuc
     setError(null);
     
     try {
-      const response = await fetch('/api/parking/reservations', {
+      const response = await apiFetch('/api/parking/reservations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

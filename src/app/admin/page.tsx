@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/lib/api-fetch';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -108,7 +109,7 @@ export default function AdminPage() {
   const fetchUsers = async () => {
     try {
       // Try API endpoint first
-      const response = await fetch('/api/admin/users');
+      const response = await apiFetch('/api/admin/users');
       const result = await response.json();
       
       if (result.success && result.users) {
@@ -231,7 +232,7 @@ export default function AdminPage() {
       if (inviteError) throw inviteError;
 
       // Send invite email via API
-      const response = await fetch('/api/send-invite', {
+      const response = await apiFetch('/api/send-invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

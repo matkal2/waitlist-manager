@@ -1,3 +1,5 @@
+import { authorize } from '@/lib/api-auth';
+import { permissions } from '@/lib/permissions';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import type { WaitlistEntry } from '@/types/database';
@@ -18,6 +20,9 @@ interface NotifyRequest {
 
 // Manual "Notify" from Match Alerts: emails each assigned agent (unassigned go to the leasing inbox) about one unit
 export async function POST(request: NextRequest) {
+  const caller = await authorize(request, permissions.canAccessWaitlist);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     const { unit, entryIds }: NotifyRequest = await request.json();
     if (!unit || !entryIds?.length) {

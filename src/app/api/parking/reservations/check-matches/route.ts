@@ -1,3 +1,4 @@
+import { authorize } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -60,7 +61,10 @@ interface ReservationMatch {
 }
 
 // GET - Check for matches between active reservations and Directory
-export async function GET() {
+export async function GET(request: Request) {
+  const caller = await authorize(request);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     // Fetch active reservations
     const { data: reservations, error: reservationsError } = await supabase

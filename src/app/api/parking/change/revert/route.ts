@@ -1,3 +1,4 @@
+import { authorize } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -19,6 +20,9 @@ interface UndoRevertRequest {
 }
 
 export async function POST(request: Request) {
+  const caller = await authorize(request);
+  if (caller instanceof NextResponse) return caller;
+
   try {
     const body = await request.json();
     

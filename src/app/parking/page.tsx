@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/lib/api-fetch';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -191,7 +192,7 @@ export default function ParkingPage() {
       }
       
       // Fetch parking data from Google Sheet API
-      const parkingRes = await fetch('/api/parking');
+      const parkingRes = await apiFetch('/api/parking');
       const parkingData = await parkingRes.json();
       
       if (parkingData.success) {
@@ -210,7 +211,7 @@ export default function ParkingPage() {
       }
       
       // Fetch activity log from parking_changes
-      const activityRes = await fetch('/api/parking/change');
+      const activityRes = await apiFetch('/api/parking/change');
       const activityData = await activityRes.json();
       if (activityData.success) {
         setActivityLog(activityData.changes || []);
@@ -229,7 +230,7 @@ export default function ParkingPage() {
     setCancellingReservation(reservationId);
     try {
       const cancelledBy = userFullName || user?.email || 'Unknown';
-      const response = await fetch(`/api/parking/reservations?id=${reservationId}&cancelled_by=${encodeURIComponent(cancelledBy)}`, {
+      const response = await apiFetch(`/api/parking/reservations?id=${reservationId}&cancelled_by=${encodeURIComponent(cancelledBy)}`, {
         method: 'DELETE',
       });
       
@@ -255,7 +256,7 @@ export default function ParkingPage() {
       if (property && property !== 'all') {
         params.set('property', property);
       }
-      const response = await fetch(`/api/parking/snapshot?${params}`);
+      const response = await apiFetch(`/api/parking/snapshot?${params}`);
       const data = await response.json();
       if (data.success) {
         // Use portfolio trend if viewing all properties, otherwise use property-specific data
@@ -356,7 +357,7 @@ export default function ParkingPage() {
             };
           });
 
-          const response = await fetch('/api/parking/snapshot', {
+          const response = await apiFetch('/api/parking/snapshot', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ snapshots }),
@@ -392,7 +393,7 @@ export default function ParkingPage() {
 
     setRevertingId(change.id);
     try {
-      const response = await fetch('/api/parking/change/revert', {
+      const response = await apiFetch('/api/parking/change/revert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -424,7 +425,7 @@ export default function ParkingPage() {
 
     setRevertingId(change.id);
     try {
-      const response = await fetch('/api/parking/change/revert', {
+      const response = await apiFetch('/api/parking/change/revert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

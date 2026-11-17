@@ -1,3 +1,4 @@
+import { systemAuthHeaders } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
 import { runWaitlistCleanup } from '@/lib/waitlist-cleanup';
 import { runParkingAutoMoveOuts } from '@/lib/parking-auto-moveout';
@@ -19,6 +20,7 @@ export async function GET(request: Request) {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        ...systemAuthHeaders(),
       },
     });
 

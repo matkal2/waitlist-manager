@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/lib/api-fetch';
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -41,7 +42,7 @@ export function ParkingReservationMatches({ onConvertSuccess }: ParkingReservati
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/parking/reservations/check-matches');
+      const response = await apiFetch('/api/parking/reservations/check-matches');
       const data = await response.json();
       
       if (!response.ok) {
@@ -65,8 +66,28 @@ export function ParkingReservationMatches({ onConvertSuccess }: ParkingReservati
     setError(null);
     
     try {
-      // Update reservation status to converted
-      const response = await fetch('/api/parking/reservations', {
+      // Write the Add to the OUTPUT sheet first so a failed write leaves the reservation open
+      const changeResponse = await apiFetch('/api/parking/change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'Add',
+          tenantName: match.matched_tenant_name,
+          tenantCode: match.matched_tenant_code,
+          tenantUnit: match.unit_number,
+          property: match.property,
+          effectiveDate: new Date().toISOString().split('T')[0],
+          primarySpace: match.full_space_code,
+          submitter: 'Reservation Conversion',
+          otherNotes: `Converted from reservation for ${match.applicant_name}`,
+        }),
+      });
+      const changeData = await changeResponse.json();
+      if (!changeResponse.ok || !changeData.success) {
+        throw new Error(changeData.error || 'Failed to submit the Add request');
+      }
+
+      const response = await apiFetch('/api/parking/reservations', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -75,34 +96,11 @@ export function ParkingReservationMatches({ onConvertSuccess }: ParkingReservati
           converted_tenant_code: match.matched_tenant_code,
         }),
       });
-      
       const data = await response.json();
-      
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to convert reservation');
+        throw new Error(data.error || 'Add submitted, but the reservation could not be marked converted');
       }
-      
-      // Submit parking change to OUTPUT sheet
-      const changeResponse = await fetch('/api/parking/changes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'Add',
-          tenant_name: match.matched_tenant_name,
-          tenant_code: match.matched_tenant_code,
-          tenant_unit: match.unit_number,
-          effective_date: new Date().toISOString().split('T')[0],
-          primary_space: match.full_space_code,
-          submitter: 'Reservation Conversion',
-          other_notes: `Converted from reservation for ${match.applicant_name}`,
-        }),
-      });
-      
-      if (!changeResponse.ok) {
-        const changeData = await changeResponse.json();
-        console.warn('Warning: Reservation converted but change request may have failed:', changeData.error);
-      }
-      
+
       // Remove from matches list
       setMatches(prev => prev.filter(m => m.reservation_id !== match.reservation_id));
       setShowDialog(false);
@@ -120,7 +118,7 @@ export function ParkingReservationMatches({ onConvertSuccess }: ParkingReservati
     setError(null);
     
     try {
-      const response = await fetch(`/api/parking/reservations?id=${reservationId}`, {
+      const response = await apiFetch(`/api/parking/reservations?id=${reservationId}`, {
         method: 'DELETE',
       });
       
