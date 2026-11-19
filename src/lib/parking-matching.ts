@@ -38,6 +38,13 @@ export const PROPERTY_ALIASES: Record<string, string> = {
 export const normalizeParkingProperty = (property: string) =>
   PROPERTY_ALIASES[(property || '').trim().toLowerCase()] || property;
 
+// The Directory files the Grand buildings (8465-8471) under Green Bay 546
+const GRAND_BUILDINGS = ['8465', '8467', '8469', '8471'];
+export function directoryParkingProperty(property: string, unit: string | null | undefined): string {
+  const building = (unit || '').trim().match(/^(\d{4})-/)?.[1];
+  return property === 'Green Bay 546' && building && GRAND_BUILDINGS.includes(building) ? 'Grand' : property;
+}
+
 // West Montrose residents park on their own side of the street:
 // even buildings (3634, 3640, 3644, 3648) and odd buildings (3639, 3643, 3647)
 const SAME_SIDE_PROPERTIES = ['West Montrose'];

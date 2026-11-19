@@ -1,6 +1,6 @@
 import { authorize } from '@/lib/api-auth';
 import { NextResponse } from 'next/server';
-import { normalizeParkingProperty } from '@/lib/parking-matching';
+import { directoryParkingProperty, normalizeParkingProperty } from '@/lib/parking-matching';
 
 const PARKING_SPREADSHEET_ID = '1w78XH8yuyuoZm_l1PtHIFzXygwEjS56lV0rZwEQvNwM';
 
@@ -86,7 +86,9 @@ async function fetchDirectory(): Promise<DirectoryEntry[]> {
     }
     
     // Title case the property name
-    const property = propertyRaw ? normalizeParkingProperty(titleCaseProperty(propertyRaw)) : undefined;
+    const property = propertyRaw
+      ? directoryParkingProperty(normalizeParkingProperty(titleCaseProperty(propertyRaw)), unitNumber)
+      : undefined;
     
     entries.push({
       tenantCode,

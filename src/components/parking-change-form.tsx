@@ -33,6 +33,7 @@ interface ParkingSpot {
   full_space_code: string;
   status?: 'Occupied' | 'Vacant' | 'Notice' | 'Reserved' | 'Future';
   tenant_code?: string | null;
+  tenant_name?: string | null;
   monthly_rent?: number;
   spot_type?: string;
   termination_date?: string | null;
@@ -966,7 +967,7 @@ export function ParkingChangeForm({ onSubmitSuccess, submitterName, properties, 
                                 </div>
                               </td>
                               <td className="px-3 py-2 text-muted-foreground">
-                                {spot.tenant_code || '-'}
+                                {spot.tenant_name || spot.tenant_code || '-'}
                               </td>
                             </tr>
                           );
